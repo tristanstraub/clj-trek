@@ -8,18 +8,23 @@
 (def basic
   (insta/parser
     "S = line-number ws+ statement #';'?
-     statement = comment | gosub | print | print-using | input | if | assignment | dim | def | mat | for | goto | next | image
+     statement = comment | gosub | print | print-using | input | if | assignment | dim | def | mat | for | goto | next | image | return | end
      ws = #'[ \t]'
      comment = \"REM\" #'.*'
-     image = \"IMAGE\"
+     end = \"END\"
+     return = \"RETURN\"
+     image = \"IMAGE\" ws+ (format | quoted-string) (',' format-list)*
+     format-list = (format | quoted-string) (',' format-list)*
+     format = integer format-type | format-type | (integer \"(\" format-list \")\")
+     format-type = \"D\" | \"X\" | \"A\"
      gosub = \"GOSUB\" ws+ line-number
-     print = \"PRINT\" (ws+ value (value | ';')*)?
-     print-using = \"PRINT\" ws+ \"USING\" ws+ integer ';' expression (',' expression)*
-     input = \"INPUT\" ws+ identifier
+     print = \"PRINT\" (ws+ expression ((\",\")? expression | ';')*)?
+     print-using = \"PRINT\" ws+ \"USING\" ws+ integer (';' expression (',' expression)*)?
+     input = \"INPUT\" ws+ identifier (\",\" identifier)*
      dim = \"DIM\" ws+ array-defs
      def = \"DEF\" ws+ identifier '(' fn-args ')' '=' expression
      mat = \"MAT\" ws+ identifier '=ZER'
-     for = \"FOR\" ws+ identifier ws* '=' integer ws+ 'TO' ws+ (integer | identifier)
+     for = \"FOR\" ws+ identifier ws* '=' expression ws+ 'TO' ws+ expression
      if = \"IF\" ws+ bool-expression ws+ 'THEN' ws+ line-number
      goto = \"GOTO\" ws+ integer-expression (ws+ 'OF' ws+ integer (',' integer)*)?
      next = \"NEXT\" ws+ identifier
@@ -53,7 +58,9 @@
        (map basic)
        (filter :reason)
        first))
-(parse)
+
+
+
 (defn -main
   "I don't do a whole lot ... yet."
   [& args]
