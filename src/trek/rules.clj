@@ -5,11 +5,11 @@
             [instaparse.core :as insta]
             [clojure.walk :as walk]))
 
-(defmacro defrule [rule args & body]
+(defmacro defrule [rule & [args & body]]
   `(defn ~(with-meta (symbol (str "rule-" (first (str/split rule #" "))))
             {:rule rule})
      ~rule
-     ~args ~@body))
+     ~(or args '[& _]) ~@body))
 
 (defn ns-rules [ns]
   (->> (ns-publics ns)

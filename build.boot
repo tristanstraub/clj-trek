@@ -5,7 +5,8 @@
           :source-paths   #{"test"}
           :dependencies   '[[org.clojure/clojure "RELEASE"]
                             [adzerk/boot-test "RELEASE" :scope "test"]
-                            [instaparse "1.4.7"]])
+                            [instaparse "1.4.7"]
+                            [clojure-future-spec "1.9.0-alpha17"]])
 
 (task-options!
  aot {:namespace   #{'trek.core}}
