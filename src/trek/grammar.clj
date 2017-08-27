@@ -104,4 +104,4 @@
 (defrule "identifier = #'[A-Z]' #'[A-Z0-9]*[$]?'")
 (defrule "quoted-string = <'\"'> #'[^\"]*' <'\"'>"
   [v]
-  v)
+  (emit :value v))

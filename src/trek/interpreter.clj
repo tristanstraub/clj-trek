@@ -13,12 +13,18 @@
   [machine]
   {:pre [(-> machine :program :lines)]}
   (let [lines (get-in machine [:program :lines])]
-    (-> machine
-        (machine/evaluate (get lines (:ptr machine)))
-        (assoc :ptr (->> (keys lines)
-                         (filter #(< (:ptr machine) %))
-                         sort
-                         first)))))
+    (as-> (machine/evaluate machine (get lines (:ptr machine)))
+        machine
+        (cond-> machine
+            (:goto machine)
+            (-> (assoc :ptr (:goto machine))
+                (dissoc :goto))
+
+            (not (:goto machine))
+            (assoc :ptr (->> (keys lines)
+                             (filter #(< (:ptr machine) %))
+                             sort
+                             first))))))
         ;; (cond->
         ;;     (:ptr machine) (cond->
         ;;                        (:goto machine) (assoc :ptr (:goto machine))
@@ -106,9 +112,11 @@
 
 (defeval :print
   [machine {:keys [args]}]
+
   (update machine :output
           (fn [coll]
-            (apply conj coll (map #(machine/evaluate machine %) args)))))
+            (-> (apply conj coll (map #(machine/evaluate machine %) args))
+                (conj :newline)))))
 
 ;; -- GOTO --
 
@@ -119,7 +127,7 @@
 
 (defeval :goto
   [machine {:keys [line-number]}]
-  (goto line-number))
+  (goto machine line-number))
 
 ;; -- GOSUB --
 
@@ -147,3 +155,14 @@
 (defemit :image
   [machine _ args]
   {:type :image :args args})
+
+;; -- values --
+
+(defemit :value
+  [machine _ value]
+  {:type :value
+   :value value})
+
+(defeval :value
+  [machine {:keys [value]}]
+  value)
