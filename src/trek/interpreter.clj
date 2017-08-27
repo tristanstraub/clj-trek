@@ -9,6 +9,13 @@
    :stack   nil
    :output  []})
 
+(defn next-line [machine]
+  (let [lines (get-in machine [:program :lines])]
+    (->> (keys lines)
+         (filter #(< (:ptr machine) %))
+         sort
+         first)))
+
 (defmethod machine/step :interpreter
   [machine]
   {:pre [(-> machine :program :lines)]}
@@ -21,34 +28,17 @@
                 (dissoc :goto))
 
             (not (:goto machine))
-            (assoc :ptr (->> (keys lines)
-                             (filter #(< (:ptr machine) %))
-                             sort
-                             first))))))
-        ;; (cond->
-        ;;     (:ptr machine) (cond->
-        ;;                        (:goto machine) (assoc :ptr (:goto machine))
-        ;;                        (not (:goto machine))
-        ;;                        )
-        ;;     ;; (and (:ptr machine)
-        ;;     ;;      (get (:program machine) (:ptr machine)))
-
-
-        ;; ;;     ;; true
-        ;; ;;     ;; (as-> machine
-        ;; ;;     ;;     (println :machine machine)
-        ;; ;;     ;;   machine)
-        ;; ;;     )
-        ;; )
+            (assoc :ptr (next-line machine))))))
 
 (defn goto [machine n]
   (-> machine
       (assoc :goto n)))
 
-(defn gosub [machine n]
-  (-> machine
-      (assoc :goto n)
-      (update :stack conj n)))
+(defn gosub [machine line-number]
+  (let [lines (get-in machine [:program :lines])]
+    (-> machine
+        (assoc :goto line-number)
+        (update :stack conj (next-line machine)))))
 
 (defn return [machine]
   (-> machine
@@ -137,8 +127,8 @@
    :line-number line-number})
 
 (defeval :gosub
-  [machine {:keys [n] :as gosub}]
-  (gosub machine n))
+  [machine {:keys [line-number]}]
+  (gosub machine line-number))
 
 ;; -- RETURN --
 
