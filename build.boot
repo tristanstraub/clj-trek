@@ -6,7 +6,8 @@
           :dependencies   '[[org.clojure/clojure "RELEASE"]
                             [adzerk/boot-test "RELEASE" :scope "test"]
                             [instaparse "1.4.7"]
-                            [clojure-future-spec "1.9.0-alpha17"]])
+                            [clojure-future-spec "1.9.0-alpha17"]
+                            [spyscope "0.1.6"]])
 
 (task-options!
  aot {:namespace   #{'trek.core}}
@@ -33,3 +34,5 @@
   (apply (resolve 'app/-main) args))
 
 (require '[adzerk.boot-test :refer [test]])
+(require 'spyscope.core)
+(boot.core/load-data-readers!)

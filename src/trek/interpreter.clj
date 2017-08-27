@@ -1,17 +1,39 @@
 (ns trek.interpreter
-  (:require [trek.machine :as machine]
-            [trek.statement :refer [evaluate-statement]]
-            [trek.emitter :refer [emit]]))
+  (:require [trek.machine :as machine]))
 
 (defn interpreter []
   {:type    :interpreter
    :program nil
    :env     nil
    :ptr     nil
-   :stack   nil})
+   :stack   nil
+   :output  []})
 
-;; (defn load-program [machine listing]
-;;   (assoc machine :program (parser/generate-program emitter listing)))
+(defmethod machine/step :interpreter
+  [machine]
+  {:pre [(-> machine :program :lines)]}
+  (let [lines (get-in machine [:program :lines])]
+    (-> machine
+        (machine/evaluate (get lines (:ptr machine)))
+        (assoc :ptr (->> (keys lines)
+                         (filter #(< (:ptr machine) %))
+                         sort
+                         first)))))
+        ;; (cond->
+        ;;     (:ptr machine) (cond->
+        ;;                        (:goto machine) (assoc :ptr (:goto machine))
+        ;;                        (not (:goto machine))
+        ;;                        )
+        ;;     ;; (and (:ptr machine)
+        ;;     ;;      (get (:program machine) (:ptr machine)))
+
+
+        ;; ;;     ;; true
+        ;; ;;     ;; (as-> machine
+        ;; ;;     ;;     (println :machine machine)
+        ;; ;;     ;;   machine)
+        ;; ;;     )
+        ;; )
 
 (defn goto [machine n]
   (-> machine
@@ -24,18 +46,24 @@
 
 (defn return [machine]
   (-> machine
-      (assoc :ptr (peek (:stack machine)))
+      (assoc :goto (peek (:stack machine)))
       (update :stack pop)))
 
-;; -- EMITTER --
+(defmethod machine/load [:interpreter :program]
+  [machine program]
+  (-> machine
+      (assoc :program program)
+      (assoc :ptr (->> (keys (:lines program))
+                       sort
+                       first))))
 
 ;; -- default
 
 (defmacro defemit [statement-type args & body]
-  `(let [statement-type# ~statement-type]
-     (defmethod machine/emit [:interpreter statement-type#]
-       ~args
-       (assoc (do ~@body) :type statement-type#))))
+  `(defmethod machine/emit [:interpreter ~statement-type]
+     [machine# statement-type# args#]
+     (let [~args `[~machine# ~statement-type# ~@args#]]
+       (assoc (do ~@body) :type ~statement-type))))
 
 (defmacro defeval [statement-type args & body]
   `(defmethod machine/evaluate [:interpreter ~statement-type]
@@ -52,14 +80,22 @@
 
 ;; -- statement --
 
+(defemit :program
+  [machine _ statements]
+  {:lines (reduce (fn [program {:keys [line-number content]}]
+                    (assoc program line-number content))
+                  {}
+                  statements)})
+
 (defemit :statement
   [machine _ line-number content]
   {:line-number line-number
    :content     content})
 
 (defeval :statement
-  [machine {:keys [content]}]
-  (machine/evaluate machine content))
+  [machine {:keys [content] :as s}]
+  (when content
+    (machine/evaluate machine content)))
 
 ;; -- PRINT --
 
@@ -68,10 +104,11 @@
   {:type :print
    :args args})
 
-(defemit :print
+(defeval :print
   [machine {:keys [args]}]
-  (apply println (map #(machine/evaluate machine %) args))
-  machine)
+  (update machine :output
+          (fn [coll]
+            (apply conj coll (map #(machine/evaluate machine %) args)))))
 
 ;; -- GOTO --
 
@@ -93,17 +130,17 @@
 
 (defeval :gosub
   [machine {:keys [n] :as gosub}]
-  (machine/gosub machine n))
+  (gosub machine n))
 
 ;; -- RETURN --
 
 (defemit :return
-  [machine _]
+  [machine _ _]
   {:type :return})
 
 (defeval :return
   [machine _]
-  (machine/return machine))
+  (return machine))
 
 ;; -- IMAGE --
 

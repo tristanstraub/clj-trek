@@ -1,13 +1,30 @@
 (ns trek.grammar
   (:require [trek
-             [rules :refer [defrule]]
-             [statements :as statements]]
-            [trek.machine :as machine]))
+             [rules :refer [defrule]]]
+            [trek.machine :as machine]
+            [trek.rules :refer [ns-parser]]
+            [trek.rules :refer [ns-transforms]]
+            [clojure.string :as str]
+            [trek.rules :refer [ns-parse]]))
 
-(def ^:dynamic *machine*)
+(def ^:dynamic *machine* nil)
 
-(defn emit [& args]
-  (apply machine/emit *machine* args))
+(defn emit [statement-type & args]
+  {:pre [*machine*]}
+  (machine/emit *machine* statement-type args))
+
+(defn parse [machine listing]
+  {:pre [machine]}
+  (binding [*machine* machine]
+    (let [parser     (ns-parser (the-ns 'trek.grammar))
+          transforms (ns-transforms (the-ns 'trek.grammar))]
+      (doall (ns-parse parser transforms listing :program)))))
+
+;;(parse (trek.interpreter/interpreter) "10 PRINT\n20 GOTO 10\n")
+
+(defrule "program = S (<\"\n\"> S)* <\"\n\"?>"
+  [statement & statements]
+  (emit :program `(~statement ~@statements)))
 
 (defrule "S = line-number <ws> statement <#';'?>"
   [n s]
@@ -17,7 +34,7 @@
   [n]
   (Integer/parseInt n))
 
-(defrule "statement = comment | gosub | print | print-using | input | if | assignment | dim | def | mat | for | goto | next | image | return | end"
+(defrule "statement = comment | gosub | print | print-using | input | if | assignment | dim | def | mat | for | goto | goto-of | next | image | return | end"
   [s]
   s)
 
@@ -29,7 +46,11 @@
   [& args]
   (emit :image args))
 
-(defrule "goto = <\"GOTO\"> <ws> line-number (ws 'OF' ws integer (',' integer)*)?"
+(defrule "goto = <\"GOTO\"> <ws> line-number"
+  [n]
+  (emit :goto n))
+
+(defrule "goto-of = <\"GOTO\"> <ws> expression <ws> 'OF' <ws> integer (',' integer)*"
   [n & _]
   (emit :goto n))
 

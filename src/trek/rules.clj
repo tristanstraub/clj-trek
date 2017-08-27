@@ -9,9 +9,11 @@
   `(defn ~(with-meta (symbol (str "rule-" (first (str/split rule #" "))))
             {:rule rule})
      ~rule
-     ~(or args '[& _]) ~@body))
+     ~(or args '[& _])
+     ~@body))
 
-(defn ns-rules [ns]
+(defn ns-rules
+  [ns]
   (->> (ns-publics ns)
        (filter (fn [[k v]] (:rule (meta v))))
        (into {})))
@@ -35,14 +37,14 @@
   (->> (insta/parse parser input :start start)
        (insta/transform transforms)))
 
-(defrule "S = A B"
-  [a b]
-  (str a ":" b))
+(comment (defrule "S = A B"
+           [a b]
+           (str a ":" b))
 
-(defrule "A = \"a\""
-  [a]
-  (format "(is %s)" a))
+         (defrule "A = \"a\""
+           [a]
+           (format "(is %s)" a))
 
-(defrule "B = \"b\""
-  [b]
-  (format "(is %s)" b))
+         (defrule "B = \"b\""
+           [b]
+           (format "(is %s)" b)))
