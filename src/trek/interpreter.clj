@@ -43,7 +43,7 @@
 (defn return [machine]
   (-> machine
       (assoc :goto (peek (:stack machine)))
-      (update :stack pop)))
+      (update :stack (comp seq pop))))
 
 (defmethod machine/load [:interpreter :program]
   [machine program]
