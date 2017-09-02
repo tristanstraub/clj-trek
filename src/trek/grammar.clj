@@ -85,7 +85,7 @@
   ([v]
    v))
 
-(defrule "a-expression = expression additive-op v-expression"
+(defrule "a-expression = expression additive-op m-expression"
   [left op right]
   (emit :binary-operator left op right))
 
@@ -95,7 +95,7 @@
   ([left op right]
    (emit :binary-operator left op right)))
 
-(defrule "h-expression = v-expression hat-op v-expression"
+(defrule "h-expression = h-expression hat-op v-expression"
   [left op right]
   (emit :binary-operator left op right))
 
