@@ -1,13 +1,17 @@
 (ns trek.interpreter
-  (:require [trek.machine :as machine]))
+  (:require [clojure.core.async :as a]
+            [clojure.spec.alpha :as s]
+            [trek.machine :as machine]
+            [clojure.spec.test.alpha :as stest]))
+
+(def ^:dynamic *line-number* nil)
 
 (defn interpreter []
   {:type    :interpreter
    :program nil
    :env     nil
    :ptr     nil
-   :stack   nil
-   :output  []})
+   :stack   nil})
 
 (defn next-line [machine]
   (let [lines (get-in machine [:program :lines])]
@@ -18,17 +22,27 @@
 
 (defmethod machine/step :interpreter
   [machine]
-  {:pre [(-> machine :program :lines)]}
-  (let [lines (get-in machine [:program :lines])]
-    (as-> (machine/evaluate machine (get lines (:ptr machine)))
-        machine
-        (cond-> machine
+  (let [{:keys [lines]} (:program machine)
+        line            (get lines (:ptr machine))]
+    (assert line)
+    (binding [*line-number* (:ptr machine)]
+      (as->
+          (machine/evaluate machine line)
+          machine
+          (cond-> machine
             (:goto machine)
             (-> (assoc :ptr (:goto machine))
                 (dissoc :goto))
 
             (not (:goto machine))
-            (assoc :ptr (next-line machine))))))
+            (assoc :ptr (next-line machine))
+
+            true
+            (as-> machine
+                (loop [tasks (:async machine) machine machine]
+                  (if-let [task (first tasks)]
+                    (recur (rest tasks) (a/<!! (task machine)))
+                    (dissoc machine :async)))))))))
 
 (defn goto [machine n]
   (-> machine
@@ -45,7 +59,7 @@
       (assoc :goto (peek (:stack machine)))
       (update :stack (comp seq pop))))
 
-(defmethod machine/load [:interpreter :program]
+(defmethod machine/load-program [:interpreter :program]
   [machine program]
   (-> machine
       (assoc :program program)
@@ -53,22 +67,32 @@
                        sort
                        first))))
 
+(defmethod machine/emitted :default
+  [machine# statement#]
+  statement#)
+
 ;; -- default
 
 (defmacro defemit [statement-type args & body]
   `(defmethod machine/emit [:interpreter ~statement-type]
      [machine# statement-type# args#]
-     (let [~args `[~machine# ~statement-type# ~@args#]]
-       (assoc (do ~@body) :type ~statement-type))))
+     (let [~args `[~machine# ~@args#]]
+       ~@body)))
 
 (defmacro defeval [statement-type args & body]
-  `(defmethod machine/evaluate [:interpreter ~statement-type]
-     ~args
-     ~@body))
+  `(do (defmethod machine/emit [:interpreter ~statement-type]
+         [machine# statement-type# args#]
+         {:type ~statement-type
+          :args args#})
 
-(defemit :default
-  [& _]
-  (throw (Exception. "Unexecutable!")))
+       (defmethod machine/emitted [:interpreter ~statement-type]
+         [machine# statement#]
+         (:args statement#))
+
+       (defmethod machine/evaluate [:interpreter ~statement-type]
+         [machine# statement#]
+         (let [~args `[~machine# ~@(:args statement#)]]
+           ~@body))))
 
 (defeval :default
   [& _]
@@ -76,65 +100,48 @@
 
 ;; -- statement --
 
+(defeval :nop
+  [machine & _]
+  machine)
+
 (defemit :program
-  [machine _ statements]
-  {:lines (reduce (fn [program {:keys [line-number content]}]
-                    (assoc program line-number content))
+  [machine statements]
+  {:type :program
+   :lines (reduce (fn [program statement]
+                    (let [emitted               (machine/emitted machine statement)
+                          [line-number content] emitted]
+                      (assoc program line-number content)))
                   {}
                   statements)})
 
-(defemit :statement
-  [machine _ line-number content]
-  {:line-number line-number
-   :content     content})
+
 
 (defeval :statement
-  [machine {:keys [content] :as s}]
-  (when content
-    (machine/evaluate machine content)))
+  [machine line-number content]
+  (if content
+    (doall (machine/evaluate machine content))
+    machine))
 
 ;; -- PRINT --
 
-(defemit :print
-  [machine _ args]
-  {:type :print
-   :args args})
-
 (defeval :print
-  [machine {:keys [args]}]
-
-  (update machine :output
-          (fn [coll]
-            (-> (apply conj coll (map #(machine/evaluate machine %) args))
-                (conj :newline)))))
+  [machine args]
+  (apply println (map #(machine/evaluate machine %) args))
+  machine)
 
 ;; -- GOTO --
 
-(defemit :goto
-  [machine _ line-number]
-  {:type        :goto
-   :line-number line-number})
-
 (defeval :goto
-  [machine {:keys [line-number]}]
+  [machine line-number]
   (goto machine line-number))
 
 ;; -- GOSUB --
 
-(defemit :gosub
-  [machine _ line-number]
-  {:type        :gosub
-   :line-number line-number})
-
 (defeval :gosub
-  [machine {:keys [line-number]}]
+  [machine line-number]
   (gosub machine line-number))
 
 ;; -- RETURN --
-
-(defemit :return
-  [machine _ _]
-  {:type :return})
 
 (defeval :return
   [machine _]
@@ -142,17 +149,152 @@
 
 ;; -- IMAGE --
 
-(defemit :image
-  [machine _ args]
+(defeval :image
+  [machine args]
   {:type :image :args args})
 
 ;; -- values --
 
-(defemit :value
-  [machine _ value]
-  {:type :value
-   :value value})
-
 (defeval :value
-  [machine {:keys [value]}]
+  [machine value]
   value)
+
+;; -- for
+
+(defeval :for
+  [machine identifier lower upper]
+  (let [lower-value (machine/evaluate machine lower)
+        upper-value (machine/evaluate machine upper)
+        identifier  (first (machine/emitted machine identifier))]
+    (assert *line-number*)
+    (-> machine
+        (update :for assoc identifier {:bounds [lower-value upper-value]
+                                       :line-number *line-number*})
+        (update :env assoc identifier lower-value))))
+
+(defeval :next
+  [machine identifier]
+  (let [identifier (first (machine/emitted machine identifier))]
+    (-> machine
+        (update-in [:env identifier] inc)
+        (cond->
+            (< (get-in machine [:for identifier :line-number])
+               (second (get-in machine [:for identifier :bounds])))
+            (goto (get-in machine [:env identifier :line-number]))))))
+
+;; -- identifier
+
+(defeval :identifier
+  [machine identifier]
+  (let [value (get-in machine [:env identifier])]
+    (assert value)
+    value))
+
+;; -- binary operator
+
+(defeval :binary-operator
+  [machine left op right]
+  (throw (Exception. "not implemented")))
+
+;; -- INPUT
+
+(defmacro go? [& body]
+  `(a/go (try ~@body
+              (catch Throwable t#
+                t#))))
+
+(defmacro <? [& args]
+  `(let [value# (a/<! ~@args)]
+     (when (instance? Throwable value#)
+       (throw value#))
+     value#))
+
+(defn async [machine f]
+  (update machine :async conj f))
+
+(defmacro with-chan [[cname chan] & body]
+  `(try (let [~cname ~chan
+              result# ~@body]
+          result#)
+        (finally
+          (a/close! ~cname))))
+
+(defeval :input
+  [machine inputs]
+  (async machine (fn [machine]
+                   (go?
+                    (update machine :env assoc (first (machine/emitted machine (first inputs))) (read-line))))))
+
+;; -- IF
+
+(defeval :if
+  [machine expression then]
+  (if (machine/evaluate machine expression)
+    (machine/evaluate machine then)
+    machine))
+
+;; -- bool op
+
+(defeval :compare
+  [machine a vs b]
+  (let [a (machine/evaluate machine a)
+        b (machine/evaluate machine b)]
+    (case vs
+      ;;  #'<>' | '>' | '<=' | '<' | '=' | '>='"
+      "<>" (not= a b)
+      ">" (> a b)
+      "<=" (<= a b)
+      "<" (< a b)
+      "=" (= a b)
+      ">=" (>= a b))))
+
+(defeval :bool-op
+  [machine a vs b]
+  (let [a (machine/evaluate machine a)
+        b (machine/evaluate machine b)]
+    (println :boolvs vs)))
+
+(defeval :assign
+  [machine id value]
+  (update machine :env assoc
+          (first (machine/emitted machine id))
+          (machine/evaluate machine value)))
+
+(defeval :array-ref
+  [machine identifier dimensions]
+  (let [value (get-in machine `[:env identifier ~@dimensions])]
+    (assert value)
+    value))
+
+(defn new-array
+  [value dimensions]
+  (if (seq dimensions)
+    (into [] (for [i (range (first dimensions))]
+               (new-array value (rest dimensions))))
+    value))
+
+;; (defmulti evaluate (fn [machine statement] [(:type machine) (:type statement)]))
+;; (defmethod evaluate :default
+;;   [machine statement]
+;;   any?)
+
+;; (defmethod evaluate [:interpreter :rem]
+;;   [machine statement]
+;;   (s/cat :machine ::machine
+;;          :statement ::nop-statement))
+
+;; (s/def ::machine any?)
+;; (s/def ::nop-statement any?)
+
+;; (s/fdef machine/evaluate
+;;         :args (s/multi-spec evaluate (fn [machine statement] [(:type machine) (:type statement)])))
+
+;; (stest/instrument `machine/evaluate)
+
+(defeval :dim
+  [machine array-defs]
+  (reduce (fn [machine array-def]
+            (let [[[name dimensions]] (machine/emitted machine array-def)]
+              (assoc-in machine [:env name] (new-array dimensions))))
+          machine
+          array-defs))

@@ -1,50 +1,52 @@
 (ns trek.rules
-  (:require [clojure.java.io :as io]
-            [clojure.string :as str]
-            [clojure.test :refer [deftest is]]
-            [instaparse.core :as insta]
-            [clojure.walk :as walk]))
+  (:require [clojure.string :as str]
+            [instaparse.core :as insta]))
 
-(defmacro defrule [rule & [args & body]]
-  `(defn ~(with-meta (symbol (str "rule-" (first (str/split rule #" "))))
-            {:rule rule})
-     ~rule
-     ~(or args '[& _])
-     ~@body))
+(defmacro defgrammar [grammar-name defrule]
+  `(do
+     (def ~grammar-name {})
 
-(defn ns-rules
-  [ns]
-  (->> (ns-publics ns)
-       (filter (fn [[k v]] (:rule (meta v))))
+     (defmacro ~defrule [rule# & [args# & body#]]
+       `(do (alter-var-root #'~'~grammar-name
+                            assoc ~rule# (fn ~(or args# '[& _#])
+                                           ~@body#))
+            nil))))
+
+(defn rules [grammar]
+  (->> grammar
+       (map first)
+       (str/join ";\n")))
+
+(defn transforms [grammar]
+  (->> grammar
+       (map (fn [[rule transform]]
+              [(keyword (first (str/split rule #" "))) transform]))
        (into {})))
 
-(defn ns-grammar [ns]
-  (->> (ns-rules ns)
-       vals
-       (map meta)
-       (map :rule)
-       (str/join "\n")))
+(defn parser [grammar]
+  (insta/parser (rules grammar)))
 
-(defn ns-transforms [ns]
-  (->> (ns-rules ns)
-       (map (fn [[k v]] [(keyword (second (re-find #"^rule-(.*)$" (str k)))) v]))
-       (into {})))
+(defn parse [parser transforms input start]
+  (let [parsed (insta/parse parser input :start start)]
+    (if (instaparse.core/failure? parsed)
+      (throw (ex-info "Could not parse" parsed))
+      (insta/transform transforms parsed))))
 
-(defn ns-parser [ns]
-  (insta/parser (ns-grammar ns)))
+(comment (do
+           (defgrammar basic defrule)
 
-(defn ns-parse [parser transforms input start]
-  (->> (insta/parse parser input :start start)
-       (insta/transform transforms)))
+           (defrule "S = A | A B"
+             ([a]
+              (str "just:a"))
+             ([a b]
+              (str a ":" b)))
 
-(comment (defrule "S = A B"
-           [a b]
-           (str a ":" b))
+           (defrule "A = \"a\""
+             [a]
+             (format "(is %s)" a))
 
-         (defrule "A = \"a\""
-           [a]
-           (format "(is %s)" a))
+           (defrule "B = \"b\""
+             [b]
+             (format "(is %s)" b))
 
-         (defrule "B = \"b\""
-           [b]
-           (format "(is %s)" b)))
+           (parse (parser basic) (transforms basic) "ab" :S)))
