@@ -157,40 +157,34 @@
   [& array-defs]
   array-defs)
 
-(defrule "def = <\"DEF\" ws> identifier <'('> fn-args <')' '='> expression"
-  [identifier fn-args expression]
-  )
+(defrule "function-call = function-name <'('> expression <')'>"
+  [fn-name arg]
+  (emit :call fn-name arg))
 
-(defrule "end = \"END\""
-  )
+(defrule "comparison-op = #'<>' | '>' | '<=' | '<' | '=' | '>='"
+  [op]
+  op)
+
+(defrule "decimal = #'[0-9]*' '.'? #'[0-9]+'"
+  [& values]
+  (emit :value (Float/parseFloat (apply str values))))
+
+(defrule "end = <\"END\">"
+  []
+  (emit :nop))
 
 (defrule "format-list = (format | quoted-string) (',' format-list)*")
 (defrule "format = integer format-type | format-type | (integer \"(\" format-list \")\")")
 (defrule "format-type = \"D\" | \"X\" | \"A\"")
 (defrule "print-using = \"PRINT\" ws \"USING\" ws integer (';' expression (',' expression)*)?")
-
-
 (defrule "mat = \"MAT\" ws identifier '=ZER'")
-
-
-
-
 (defrule "bool-op = 'OR'")
+(defrule "def = <\"DEF\" ws> identifier <'('> fn-args <')' '='> expression"
+  ;;[identifier fn-args expression]
+  )
 (defrule "fn-args = identifier (',' fn-args)?")
-
-
-
-
-(defrule "function-call = function-name '(' expression ')'")
-(defrule "function-name = #'[A-Z]+'")
-(defrule "comparison-op = #'<>' | '>' | '<=' | '<' | '=' | '>='"
-  [op]
-  op)
-
-
+(defrule "function-name = #'[A-Z]+'"
+  [name]
+  name)
 
 (defrule "integer-expression = integer | (identifier op integer)")
-
-(defrule "decimal = #'[0-9]*' '.'? #'[0-9]+'"
-  [& values]
-  (emit :value (Float/parseFloat (apply str values))))

@@ -194,6 +194,9 @@
 
 (defeval :binary-operator
   [machine left op right]
+  ;; (case op
+  ;;   "*"
+  ;;   )
   (throw (Exception. "not implemented")))
 
 ;; -- INPUT
@@ -291,10 +294,24 @@
 
 ;; (stest/instrument `machine/evaluate)
 
+(defn value-type-of [name]
+  (case (last name)
+    \$ ""
+    0))
+
 (defeval :dim
   [machine array-defs]
   (reduce (fn [machine array-def]
-            (let [[[name dimensions]] (machine/emitted machine array-def)]
-              (assoc-in machine [:env name] (new-array dimensions))))
+            (let [[name dimensions] (machine/emitted machine array-def)
+                  name              (first (machine/emitted machine name))
+                  dimensions        (mapv #(first (machine/emitted machine %)) dimensions)]
+              (assoc-in machine [:env name] (new-array (value-type-of name) dimensions))))
           machine
           array-defs))
+
+;; -- Calls
+
+(defeval :call
+  [machine fn-name arg]
+  (case fn-name)
+  )
