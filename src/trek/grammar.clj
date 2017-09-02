@@ -12,15 +12,22 @@
   {:pre [*machine*]}
   (machine/emit *machine* statement-type args))
 
+(defn emitted
+  [type]
+  (machine/emitted *machine* type))
+
 (defn parser []
   {:parser     (rules/parser basic)
    :transforms (rules/transforms basic)})
 
-(defn parse [parser machine listing]
-  {:pre [machine]}
-  (binding [*machine* machine]
-    (let [{:keys [parser transforms]} parser]
-      (doall (rules/parse parser transforms listing :program)))))
+(defn parse
+  ([parser machine listing]
+   (parse parse machine listing :program))
+  ([parser machine listing start]
+   {:pre [machine]}
+   (binding [*machine* machine]
+     (let [{:keys [parser transforms]} parser]
+       (doall (rules/parse parser transforms listing start))))))
 
 (defrule "program = S (<\"\n\"> S)* <\"\n\"?>"
   [statement & statements]
@@ -34,27 +41,29 @@
   [n]
   (Integer/parseInt n))
 
-(defrule "statement = comment | gosub | print | print-using | input | if | assignment | dim | def | mat | for | goto | goto-of | next | image | return | end"
+(defrule "statement = comment | gosub | print-using | print | input | if | assignment | dim | def | mat | for | goto | goto-of | next | image | return | end"
   [s]
   s)
 
-(defrule "print = <\"PRINT\"> (<ws> | expression | \",\" | \";\")* "
+(defrule "print = <\"PRINT\"> <ws>* (! 'USING' (<ws> | expression | <\",\"> | <\";\">))* "
   ([]
    (emit :print))
   ([& args]
    (emit :print args)))
 
-(defrule "image = <\"IMAGE\"> <ws+> (format | quoted-string) (',' format-list)*"
-  [& args]
-  (emit :image args))
+(defrule "print-using = <'PRINT'> <ws+> <'USING'> <ws> line-number (<';'> expression (<','> expression)*)?"
+  [line-number & expressions]
+  (emit :print-using [line-number expressions]))
 
 (defrule "goto = <\"GOTO\"> <ws> line-number"
   [n]
   (emit :goto n))
 
-(defrule "goto-of = <\"GOTO\"> <ws> expression <ws> 'OF' <ws> integer (',' integer)*"
-  [n & _]
-  (emit :goto n))
+(defrule "goto-of = <\"GOTO\"> <ws> expression <ws> (<'OF'> <ws> line-number (<','> line-number)*)"
+  ([n]
+   (emit :goto n))
+  ([expression & line-numbers]
+   (emit :goto-of expression line-numbers)))
 
 (defrule "gosub = <\"GOSUB\"> <ws> line-number"
   [n]
@@ -68,16 +77,43 @@
   [identifier lower upper]
   (emit :for identifier lower upper))
 
-(defrule "expression = value | <'('> expression <')'> | expression op expression"
+(defrule "expression = v-expression | m-expression | a-expression"
+  [v]
+  v)
+
+(defrule "v-expression = value | <'('> expression <')'> | h-expression"
+  ([v]
+   v))
+
+(defrule "a-expression = expression additive-op expression"
+  [left op right]
+  (emit :binary-operator left op right))
+
+(defrule "m-expression = v-expression | m-expression multiplicative-op m-expression"
   ([v]
    v)
   ([left op right]
    (emit :binary-operator left op right)))
 
+(defrule "h-expression = v-expression hat-op v-expression"
+  [left op right]
+  (emit :binary-operator left op right))
+
+(defrule "additive-op = '+' | '-'"
+  [v]
+  v)
+
+(defrule "multiplicative-op = '*' | '/'"
+  [v]
+  v)
+
+(defrule "hat-op = '^'"
+  [v]
+  v)
+
 (defrule "quoted-string = <'\"'> #'[^\"]*' <'\"'>"
   [v]
   (emit :value v))
-
 
 (defrule "value = function-call | quoted-string | integer | variable | decimal"
   [x]
@@ -100,9 +136,7 @@
   [expression line-number]
   (emit :if expression (emit :goto line-number)))
 
-(defrule "op = '*' | '+' | '-' | '^' | '/'"
-  [v]
-  v)
+
 
 (defrule "variable = identifier | array-ref"
   [v]
@@ -185,11 +219,30 @@
   [identifier]
   (emit :zero-array identifier))
 
-(defrule "format-list = (format | quoted-string) (',' format-list)*")
-(defrule "format = integer format-type | format-type | (integer \"(\" format-list \")\")")
-(defrule "format-type = \"D\" | \"X\" | \"A\"")
-(defrule "print-using = \"PRINT\" ws \"USING\" ws integer (';' expression (',' expression)*)?")
-(defrule "bool-op = 'OR'")
+(defrule "bool-op = <'OR'>"
+  []
+  :or)
 
+(defrule "image = <\"IMAGE\"> <ws+> formatter-list"
+  [fl]
+  fl)
 
-(defrule "integer-expression = integer | (identifier op integer)")
+(defrule "formatter-list = formatter (<','> formatter)*"
+  [a & bs]
+  (apply emit :formatter-list `[~a ~@bs]))
+
+(defrule "formatter = format-count format-type | quoted-string | format-type | (format-count \"(\" formatter-list \")\")"
+  ([number type]
+   (emit :format-type (str number (first (emitted type)))))
+  ([type]
+   type)
+  ([number _ format-list _]
+   (emit :format-repeat number format-list)))
+
+(defrule "format-count = #'[-]?[0-9]+'"
+  [number]
+  (Integer/parseInt number))
+
+(defrule "format-type = \"D\" | \"X\" | \"A\""
+  [type]
+  (emit :format-type type))

@@ -5,3 +5,4 @@
 (defmulti evaluate (fn [machine statement] [(:type machine) (:type statement)]))
 (defmulti load-program (fn [machine program] [(:type machine) (:type program)]))
 (defmulti step (fn [machine] (:type machine)))
+(defmulti format (fn [machine formatter] [(:type machine) (:type formatter)]))

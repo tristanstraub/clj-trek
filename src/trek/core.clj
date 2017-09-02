@@ -9,21 +9,31 @@
 (defonce history (atom nil))
 (defonce machine (atom nil))
 
+(defn next-line []
+  (get-in @machine [:source (:ptr @machine)]))
+
 (defn print-next []
-  (clojure.pprint/pprint
-   [
-    :env (:env @machine)
-    :stack (:stack @machine)
-    :ptr (:ptr @machine)
-    "Next:" (get-in @machine [:source (:ptr @machine)])
-    ])
+;;  (println (next-line))
+  ;; (clojure.pprint/pprint
+  ;;  [
+  ;;   :env (:env @machine)
+  ;;   :stack (:stack @machine)
+  ;;   :ptr (:ptr @machine)
+  ;;   "Next:" (get-in @machine [:source (:ptr @machine)])
+  ;;   ])
   nil
   ;; (assoc (select-keys @machine [:ptr :output :stack :for :env])
   ;;        :next (get-in @machine [:program :lines (:ptr @machine)]))
   )
 
+(defn parse*
+  ([content]
+   (parse* content :program))
+  ([content start]
+   (grammar/parse (grammar/parser) (interpreter/interpreter) content start)))
+
 (defn load-program* [machine content]
-  (let [program (grammar/parse (grammar/parser) machine content)]
+  (let [program (grammar/parse (grammar/parser) machine content :program)]
 
     (-> machine
         (assoc :source (-> content
@@ -47,6 +57,14 @@
    (start* (slurp file))
    (print-next)))
 
+(defn env
+  ([]
+   (:env @machine))
+  ([k]
+   (-> @machine
+       (machine/evaluate (parse* k :expression))
+       interpreter/last-value)))
+
 (defn reload!
   ([]
    (reload! (io/resource "sttr1.txt")))
@@ -62,14 +80,19 @@
   ([]
    (step! 1))
   ([n]
-   (swap! history conj @machine)
    (doseq [i (range n)]
      (swap! machine machine/step)
+     (swap! history conj @machine)
      (print-next))))
 
 (defn until!
   [line-number]
   (while (not= (:ptr @machine) line-number)
+    (step!)))
+
+(defn continue!
+  []
+  (while true
     (step!)))
 
 (defn back!
