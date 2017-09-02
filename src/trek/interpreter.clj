@@ -177,7 +177,7 @@
 (defeval :image
   [machine args]
   ;; TODO this is not used correctly
-  (last-value machine args))
+  machine)
 
 ;; -- values --
 
@@ -260,8 +260,9 @@
 
 (defn convert-input [id value]
   (case (variable-type id)
-    :string value
+    :string (str/upper-case value)
     :number (Integer/parseInt value)
+
     (throw (ex-info "Not an integer" {:value value :id id}))))
 
 (defn get-input [machine inputs]
@@ -496,21 +497,23 @@
   [machine [line-number expressions]]
   (let [image   (get-in machine [:program :lines line-number])
         values  (mapv #(last-value (machine/evaluate machine %)) expressions)
-        machine (machine/format (assoc machine :unformatted (into [] (reverse values))) image)]
+        machine (machine/formatter (assoc machine :unformatted (into [] (reverse values))) image)]
     (println (last-value machine))
     (assert (not (seq (:unformatted machine))))
     machine))
 
-(defeval :format-type [type])
-(defeval :formatter [number format-list])
-(defeval :formatter-list [number format-list])
-(defeval :format-repeat [number format-list])
+(defeval :format-type [machine type])
+(defeval :formatter [machine number format-list])
+(defeval :formatter-list
+  [machine number format-list]
+  machine)
+(defeval :format-repeat [machine number format-list])
 
-(defmethod machine/format [:interpreter :value]
+(defmethod machine/formatter [:interpreter :value]
   [machine formatter]
   (last-value machine (first (machine/emitted machine formatter))))
 
-(defmethod machine/format [:interpreter :format-type]
+(defmethod machine/formatter [:interpreter :format-type]
   [machine formatter]
   (let [[format-type] (machine/emitted machine formatter)
 
@@ -534,17 +537,17 @@
 (defn format-list [machine formatter]
   (let [[machine output]
         (reduce (fn [[machine output] formatter]
-                  (let [machine (machine/format machine formatter)]
+                  (let [machine (machine/formatter machine formatter)]
                     [machine (conj output (last-value machine))]))
                 [machine []]
                 (machine/emitted machine formatter))]
     (last-value machine (apply str output))))
 
-(defmethod machine/format [:interpreter :formatter-list]
+(defmethod machine/formatter [:interpreter :formatter-list]
   [machine formatter]
   (format-list machine formatter))
 
-(defmethod machine/format [:interpreter :format-repeat]
+(defmethod machine/formatter [:interpreter :format-repeat]
   [machine formatter]
   (let [[n body]  (machine/emitted machine formatter)
         formatter (machine/emitted machine body)]

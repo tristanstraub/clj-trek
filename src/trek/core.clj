@@ -15,7 +15,7 @@
   ([n]
    (get-in @machine [:source n])))
 
-(def *debug* nil)
+(def ^:dynamic *debug* nil)
 
 (defn print-next []
   (when *debug*

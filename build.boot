@@ -3,12 +3,13 @@
 
 (set-env! :resource-paths #{"resources" "src"}
           :dependencies   '[[org.clojure/clojure "1.8.0"]
-                            [adzerk/boot-test "RELEASE" :scope "test"]
+
                             [instaparse "1.4.7"]
                             [org.clojure/core.async "0.3.443"]
-                            [org.clojure/tools.nrepl "0.2.12" :exclude [org.clojure/clojure]]
+
+                            [clj-time "0.14.0"]
                             [org.clojure/tools.namespace "0.2.11"]
-                            [clj-time "0.13.0"]])
+                            [adzerk/boot-test "RELEASE" :scope "test"]])
 
 
 
