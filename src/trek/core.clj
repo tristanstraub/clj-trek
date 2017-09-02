@@ -9,22 +9,21 @@
 (defonce history (atom nil))
 (defonce machine (atom nil))
 
-(defn next-line []
-  (get-in @machine [:source (:ptr @machine)]))
+(defn line
+  ([]
+   (line (:ptr @machine)))
+  ([n]
+   (get-in @machine [:source n])))
+
+(def *debug* nil)
 
 (defn print-next []
-;;  (println (next-line))
-  ;; (clojure.pprint/pprint
-  ;;  [
-  ;;   :env (:env @machine)
-  ;;   :stack (:stack @machine)
-  ;;   :ptr (:ptr @machine)
-  ;;   "Next:" (get-in @machine [:source (:ptr @machine)])
-  ;;   ])
-  nil
-  ;; (assoc (select-keys @machine [:ptr :output :stack :for :env])
-  ;;        :next (get-in @machine [:program :lines (:ptr @machine)]))
-  )
+  (when *debug*
+    (clojure.pprint/pprint [:env (:env @machine)
+                            :stack (:stack @machine)
+                            :ptr (:ptr @machine)
+                            "Next:" (line)]))
+  nil)
 
 (defn parse*
   ([content]

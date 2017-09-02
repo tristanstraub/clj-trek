@@ -1,9 +1,9 @@
 (ns trek.interpreter
-  (:require clj-time.core
-            clj-time.local
-            [clojure.core.async :as a]
-            [trek.machine :as machine]
-            [clojure.string :as str])
+  (:require [clojure.core.async :as a]
+            [clj-time.core :as time.core]
+            [clj-time.local :as time.local]
+            [clojure.string :as str]
+            [trek.machine :as machine])
   (:import java.lang.Math))
 
 (def ^:dynamic *line-number* nil)
@@ -468,8 +468,8 @@
       "INT" (last-value machine (Math/floor arg))
       "RND" (last-value machine (* (Math/random) arg))
       "TIM" (last-value machine (case arg
-                                  0 (clj-time.core/minute (clj-time.local/local-now))
-                                  1 (clj-time.core/hour (clj-time.local/local-now))))
+                                  0 (time.core/minute (time.local/local-now))
+                                  1 (time.core/hour (time.local/local-now))))
       (eval-fn machine fn-name arg))))
 
 ;; -- def
@@ -496,8 +496,9 @@
   [machine [line-number expressions]]
   (let [image   (get-in machine [:program :lines line-number])
         values  (mapv #(last-value (machine/evaluate machine %)) expressions)
-        machine (machine/format (update machine :unformatted into values) image)]
+        machine (machine/format (assoc machine :unformatted (into [] (reverse values))) image)]
     (println (last-value machine))
+    (assert (not (seq (:unformatted machine))))
     machine))
 
 (defeval :format-type [type])
@@ -512,12 +513,23 @@
 (defmethod machine/format [:interpreter :format-type]
   [machine formatter]
   (let [[format-type] (machine/emitted machine formatter)
-        value (-> machine :unformatted peek)]
-    (last-value (update machine :unformated pop) (format (str "%" (case (last (str/lower-case format-type))
-                                                                    \x "s"
-                                                                    \a "s"
-                                                                    \d "s"))
-                                                         value))))
+
+        format-count  (if (< 1 (count format-type))
+                        (Integer/parseInt (apply str (butlast format-type)))
+                        1)
+        format-type   (last (str/lower-case format-type))
+
+        value         (-> machine :unformatted peek)
+
+        machine       (case format-type
+                        \x (last-value machine (apply str (repeat format-count (str " "))))
+
+                        \a (last-value (update machine :unformatted pop)
+                                       (format (str "%" format-count "s") value))
+
+                        \d (last-value (update machine :unformatted pop)
+                                       (format (str "%" format-count "d") (int value))))]
+    machine))
 
 (defn format-list [machine formatter]
   (let [[machine output]
