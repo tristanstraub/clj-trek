@@ -1,8 +1,9 @@
 (ns trek.interpreter
-  (:require [clojure.core.async :as a]
-            [clojure.spec.alpha :as s]
-            [trek.machine :as machine]
-            [clojure.spec.test.alpha :as stest]))
+  (:require clj-time.core
+            clj-time.local
+            [clojure.core.async :as a]
+            [trek.machine :as machine])
+  (:import java.lang.Math))
 
 (def ^:dynamic *line-number* nil)
 
@@ -13,6 +14,12 @@
    :ptr     nil
    :stack   nil})
 
+(defn last-value
+  ([machine]
+   (:last-value machine))
+  ([machine v]
+   (assoc machine :last-value v)))
+
 (defn next-line [machine]
   (let [lines (get-in machine [:program :lines])]
     (->> (keys lines)
@@ -20,11 +27,19 @@
          sort
          first)))
 
+(defmethod machine/evaluate :default
+  [machine statement]
+  (last-value machine statement))
+
+(defmethod machine/emitted :default
+  [machine statement]
+  statement)
+
 (defmethod machine/step :interpreter
   [machine]
   (let [{:keys [lines]} (:program machine)
         line            (get lines (:ptr machine))]
-    (assert line)
+    (assert line (:ptr machine))
     (binding [*line-number* (:ptr machine)]
       (as->
           (machine/evaluate machine line)
@@ -67,9 +82,7 @@
                        sort
                        first))))
 
-(defmethod machine/emitted :default
-  [machine# statement#]
-  statement#)
+
 
 ;; -- default
 
@@ -91,8 +104,10 @@
 
        (defmethod machine/evaluate [:interpreter ~statement-type]
          [machine# statement#]
-         (let [~args `[~machine# ~@(:args statement#)]]
-           ~@body))))
+         (let [~args `[~machine# ~@(:args statement#)]
+               result# (do ~@body)]
+           (assert (= :interpreter (:type result#)))
+           result#))))
 
 (defeval :default
   [& _]
@@ -126,7 +141,7 @@
 
 (defeval :print
   [machine args]
-  (apply println (map #(machine/evaluate machine %) args))
+  (apply println (map #(last-value (machine/evaluate machine %)) args))
   machine)
 
 ;; -- GOTO --
@@ -151,20 +166,21 @@
 
 (defeval :image
   [machine args]
-  {:type :image :args args})
+  ;; TODO this is not used correctly
+  (last-value machine args))
 
 ;; -- values --
 
 (defeval :value
   [machine value]
-  value)
+  (machine/evaluate machine value))
 
 ;; -- for
 
 (defeval :for
   [machine identifier lower upper]
-  (let [lower-value (machine/evaluate machine lower)
-        upper-value (machine/evaluate machine upper)
+  (let [lower-value (last-value (machine/evaluate machine lower))
+        upper-value (last-value (machine/evaluate machine upper))
         identifier  (first (machine/emitted machine identifier))]
     (assert *line-number*)
     (-> machine
@@ -188,16 +204,20 @@
   [machine identifier]
   (let [value (get-in machine [:env identifier])]
     (assert value)
-    value))
+    (last-value machine value)))
 
 ;; -- binary operator
 
+(defn apply-op [left op right]
+  (case op
+    "*" (* left right)
+    "+" (+ left right)))
+
 (defeval :binary-operator
   [machine left op right]
-  ;; (case op
-  ;;   "*"
-  ;;   )
-  (throw (Exception. "not implemented")))
+  (let [left  (last-value (machine/evaluate machine left))
+        right (last-value (machine/evaluate machine right))]
+    (last-value machine (apply-op left op right))))
 
 ;; -- INPUT
 
@@ -222,17 +242,19 @@
         (finally
           (a/close! ~cname))))
 
+(defn get-input [machine inputs]
+  (go?
+   (update machine :env assoc (first (machine/emitted machine (first inputs))) (read-line))))
+
 (defeval :input
   [machine inputs]
-  (async machine (fn [machine]
-                   (go?
-                    (update machine :env assoc (first (machine/emitted machine (first inputs))) (read-line))))))
+  (async machine #(get-input % inputs)))
 
 ;; -- IF
 
 (defeval :if
   [machine expression then]
-  (if (machine/evaluate machine expression)
+  (if (last-value (machine/evaluate machine expression))
     (machine/evaluate machine then)
     machine))
 
@@ -240,34 +262,40 @@
 
 (defeval :compare
   [machine a vs b]
-  (let [a (machine/evaluate machine a)
-        b (machine/evaluate machine b)]
-    (case vs
-      ;;  #'<>' | '>' | '<=' | '<' | '=' | '>='"
-      "<>" (not= a b)
-      ">" (> a b)
-      "<=" (<= a b)
-      "<" (< a b)
-      "=" (= a b)
-      ">=" (>= a b))))
+  (let [a (last-value (machine/evaluate machine a))
+        b (last-value (machine/evaluate machine b))]
+    (last-value machine
+                (case vs
+                  ;;  #'<>' | '>' | '<=' | '<' | '=' | '>='"
+                  "<>" (not= a b)
+                  ">" (> a b)
+                  "<=" (<= a b)
+                  "<" (< a b)
+                  "=" (= a b)
+                  ">=" (>= a b)))))
 
 (defeval :bool-op
   [machine a vs b]
-  (let [a (machine/evaluate machine a)
-        b (machine/evaluate machine b)]
-    (println :boolvs vs)))
+  (let [a (last-value (machine/evaluate machine a))
+        b (last-value (machine/evaluate machine b))])
+  (throw (ex-info "Not implemented" {:args [a vs b]})))
+
+
 
 (defeval :assign
   [machine id value]
-  (update machine :env assoc
-          (first (machine/emitted machine id))
-          (machine/evaluate machine value)))
+  (let [key   (first (machine/emitted machine id))
+        m2    (machine/evaluate machine value)
+        value (last-value m2)]
+    (-> m2
+        (assoc-in [:env key] value)
+        (last-value value))))
 
 (defeval :array-ref
   [machine identifier dimensions]
   (let [value (get-in machine `[:env identifier ~@dimensions])]
     (assert value)
-    value))
+    (last-value machine value)))
 
 (defn new-array
   [value dimensions]
@@ -275,24 +303,6 @@
     (into [] (for [i (range (first dimensions))]
                (new-array value (rest dimensions))))
     value))
-
-;; (defmulti evaluate (fn [machine statement] [(:type machine) (:type statement)]))
-;; (defmethod evaluate :default
-;;   [machine statement]
-;;   any?)
-
-;; (defmethod evaluate [:interpreter :rem]
-;;   [machine statement]
-;;   (s/cat :machine ::machine
-;;          :statement ::nop-statement))
-
-;; (s/def ::machine any?)
-;; (s/def ::nop-statement any?)
-
-;; (s/fdef machine/evaluate
-;;         :args (s/multi-spec evaluate (fn [machine statement] [(:type machine) (:type statement)])))
-
-;; (stest/instrument `machine/evaluate)
 
 (defn value-type-of [name]
   (case (last name)
@@ -311,7 +321,36 @@
 
 ;; -- Calls
 
+(defn eval-fn
+  [machine fn-name arg]
+  (let [f (get-in machine [:env fn-name])]
+    (assert f)
+    (f machine (last-value (machine/evaluate machine arg)))))
+
 (defeval :call
   [machine fn-name arg]
-  (case fn-name)
-  )
+  (let [arg (last-value (machine/evaluate machine arg))]
+    (case fn-name
+      "INT" (last-value machine (Math/floor arg))
+      "RND" (last-value machine (* (Math/random) arg))
+      "TIM" (last-value machine (case arg
+                                  0 (clj-time.core/minute (clj-time.local/local-now))
+                                  1 (clj-time.core/hour (clj-time.local/local-now))))
+      (eval-fn machine fn-name arg))))
+
+;; -- def
+
+(defeval :def
+  [machine fn-name fn-arg expression]
+  (assoc-in machine [:env (first (machine/emitted machine fn-name))]
+            (fn [machine arg]
+              (machine/evaluate (assoc-in machine [:env fn-arg] arg)
+                                expression))))
+
+(defeval :zero-array
+  [machine identifier]
+  (let [array-name (first (machine/emitted machine identifier))]
+    (update-in machine [:env array-name] #(do
+                                            (if %
+                                              (mapv (constantly (value-type-of array-name)) %)
+                                              (new-array (value-type-of array-name) [0]))))))

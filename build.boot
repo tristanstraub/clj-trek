@@ -11,7 +11,8 @@
                             [org.clojure/tools.nrepl "0.2.12" :exclude [org.clojure/clojure]]
                             [cider/cider-nrepl "0.15.1-SNAPSHOT"]
                             [refactor-nrepl "2.4.0-SNAPSHOT"]
-                            [org.clojure/tools.namespace "0.2.11"]])
+                            [org.clojure/tools.namespace "0.2.11"]
+                            [clj-time "0.14.0"]])
 
 (require '[cider.tasks :refer [add-middleware]])
 

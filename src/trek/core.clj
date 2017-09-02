@@ -10,9 +10,17 @@
 (defonce machine (atom nil))
 
 (defn print-next []
-  (clojure.pprint/pprint ["Next:" (get-in @machine [:source (:ptr @machine)]) (:env @machine)])
-  (assoc (select-keys @machine [:ptr :output :stack :for :env])
-         :next (get-in @machine [:program :lines (:ptr @machine)])))
+  (clojure.pprint/pprint
+   [
+    :env (:env @machine)
+    :stack (:stack @machine)
+    :ptr (:ptr @machine)
+    "Next:" (get-in @machine [:source (:ptr @machine)])
+    ])
+  nil
+  ;; (assoc (select-keys @machine [:ptr :output :stack :for :env])
+  ;;        :next (get-in @machine [:program :lines (:ptr @machine)]))
+  )
 
 (defn load-program* [machine content]
   (let [program (grammar/parse (grammar/parser) machine content)]
@@ -27,12 +35,16 @@
 (defn load-program [machine file]
   (load-program* machine (slurp file)))
 
+(defn start*
+  [content]
+  (let [new-machine (load-program* (interpreter/interpreter) content)]
+    (reset! machine new-machine)))
+
 (defn start!
   ([]
    (start! (io/resource "sttr1.txt")))
   ([file]
-   (let [new-machine (load-program (interpreter/interpreter) file)]
-     (reset! machine new-machine))
+   (start* (slurp file))
    (print-next)))
 
 (defn reload!

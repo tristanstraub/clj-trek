@@ -125,7 +125,7 @@
 
 (defrule "assignment-rhs = (expression | variable <'='> assignment-rhs)"
   ([expression]
-   expression)
+   (emit :value expression))
   ([identifier rhs]
    (emit :assign identifier rhs)))
 
@@ -161,6 +161,10 @@
   [fn-name arg]
   (emit :call fn-name arg))
 
+(defrule "function-name = #'[A-Z]+'"
+  [name]
+  name)
+
 (defrule "comparison-op = #'<>' | '>' | '<=' | '<' | '=' | '>='"
   [op]
   op)
@@ -173,18 +177,19 @@
   []
   (emit :nop))
 
+(defrule "def = <\"DEF\" ws> identifier <'('> identifier <')' '='> expression"
+  [fn-name fn-arg expression]
+  (emit :def fn-name fn-arg expression))
+
+(defrule "mat = <\"MAT\" ws> identifier <'=ZER'>"
+  [identifier]
+  (emit :zero-array identifier))
+
 (defrule "format-list = (format | quoted-string) (',' format-list)*")
 (defrule "format = integer format-type | format-type | (integer \"(\" format-list \")\")")
 (defrule "format-type = \"D\" | \"X\" | \"A\"")
 (defrule "print-using = \"PRINT\" ws \"USING\" ws integer (';' expression (',' expression)*)?")
-(defrule "mat = \"MAT\" ws identifier '=ZER'")
 (defrule "bool-op = 'OR'")
-(defrule "def = <\"DEF\" ws> identifier <'('> fn-args <')' '='> expression"
-  ;;[identifier fn-args expression]
-  )
-(defrule "fn-args = identifier (',' fn-args)?")
-(defrule "function-name = #'[A-Z]+'"
-  [name]
-  name)
+
 
 (defrule "integer-expression = integer | (identifier op integer)")
