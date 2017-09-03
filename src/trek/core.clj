@@ -68,7 +68,7 @@
   ([]
    (reload! (io/resource "sttr1.txt")))
   ([file]
-   (swap! machine assoc :program (:program (load-file @machine file)))
+   (swap! machine assoc :program (:program (load-file file)))
    (swap! history (fn [history]
                     (->> history
                          (map #(assoc % :program (:program (load-file @machine file)))))))

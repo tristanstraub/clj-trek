@@ -222,7 +222,9 @@
   (case op
     "*" (* left right)
     "+" (+ left right)
-    "-" (- left right)))
+    "-" (- left right)
+    "/" (/ left right)
+    "^" (Math/pow left right)))
 
 (defeval :binary-operator
   [machine left op right]
@@ -236,6 +238,12 @@
   `(a/go (try ~@body
               (catch Throwable t#
                 t#))))
+
+(defmacro go-loop? [loop-args & body]
+  `(a/go (loop ~loop-args
+           (try ~@body
+                (catch Throwable t#
+                  t#)))))
 
 (defmacro <? [& args]
   `(let [value# (a/<! ~@args)]
@@ -265,14 +273,18 @@
 
     (throw (ex-info "Not an integer" {:value value :id id}))))
 
-(defn get-input [machine inputs]
-  (go?
-   (let [id (first (machine/emitted machine (first inputs)))]
-     (assoc-in machine [:env id] (convert-input id (read-line))))))
+(defn get-input [machin inputs]
+  (loop [mac machin
+         inputs inputs]
+    (if-let [input (first inputs)]
+      (let [id (first (machine/emitted mac (first inputs)))]
+        (recur (assoc-in mac [:env id] (convert-input id (read-line)))
+               (rest inputs)))
+      mac)))
 
 (defeval :input
   [machine inputs]
-  (async machine #(get-input % inputs)))
+  (async machine #(go? (get-input % inputs))))
 
 ;; -- IF
 
@@ -471,6 +483,8 @@
       "TIM" (last-value machine (case arg
                                   0 (time.core/minute (time.local/local-now))
                                   1 (time.core/hour (time.local/local-now))))
+      "ABS" (last-value machine (Math/abs arg))
+      "SQR" (last-value machine (Math/sqrt arg))
       (eval-fn machine fn-name arg))))
 
 ;; -- def

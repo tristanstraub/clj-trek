@@ -128,7 +128,7 @@
   []
   (emit :nop))
 
-(defrule "input = <\"INPUT\"> <ws> identifier (\",\" identifier)*"
+(defrule "input = <\"INPUT\"> <ws> identifier (<\",\"> identifier)*"
   [input & inputs]
   (emit :input `[~input ~@(apply concat inputs)]))
 
