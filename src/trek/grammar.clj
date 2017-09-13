@@ -130,7 +130,7 @@
 
 (defrule "input = <\"INPUT\"> <ws> identifier (<\",\"> identifier)*"
   [input & inputs]
-  (emit :input `[~input ~@(apply concat inputs)]))
+  (emit :input `[~input ~@inputs]))
 
 (defrule "if = <\"IF\"> <ws> bool-expression <ws> <'THEN'> <ws> line-number"
   [expression line-number]

@@ -8,8 +8,10 @@
                             [org.clojure/core.async "0.3.443"]
 
                             [clj-time "0.14.0"]
-                            [org.clojure/tools.namespace "0.2.11"]
-                            [adzerk/boot-test "RELEASE" :scope "test"]])
+;;                            [org.clojure/tools.namespace "0.2.11"]
+                            ;;[adzerk/boot-test "RELEASE" :scope "test"]
+
+                            [org.clojure/core.match "0.3.0-alpha5"]])
 
 
 

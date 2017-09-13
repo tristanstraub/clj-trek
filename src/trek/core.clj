@@ -80,8 +80,12 @@
    (step! 1))
   ([n]
    (doseq [i (range n)]
-     (swap! machine machine/step)
      (swap! history conj @machine)
+     (try (swap! machine machine/step)
+          (catch Exception e
+            (swap! history pop)
+            (throw e)))
+
      (print-next))))
 
 (defn until!
@@ -104,6 +108,10 @@
   []
   (back!)
   (step!))
+
+(defn -main [& argv]
+  (start!)
+  (continue!))
 
 (comment (grammar/parse (grammar/parser)
                         (interpreter/interpreter)
