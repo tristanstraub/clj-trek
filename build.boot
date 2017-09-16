@@ -2,10 +2,18 @@
 (def version "0.1.0-SNAPSHOT")
 
 (set-env! :resource-paths #{"resources" "src"}
-          :source-paths   #{"test"}
-          :dependencies   '[[org.clojure/clojure "RELEASE"]
-                            [adzerk/boot-test "RELEASE" :scope "test"]
-                            [instaparse "1.4.7"]])
+          :dependencies   '[[org.clojure/clojure "1.8.0"]
+
+                            [instaparse "1.4.7"]
+                            [org.clojure/core.async "0.3.443"]
+
+                            [clj-time "0.14.0"]
+;;                            [org.clojure/tools.namespace "0.2.11"]
+                            ;;[adzerk/boot-test "RELEASE" :scope "test"]
+
+                            [org.clojure/core.match "0.3.0-alpha5"]])
+
+
 
 (task-options!
  aot {:namespace   #{'trek.core}}
@@ -30,5 +38,3 @@
   [a args ARG [str] "the arguments for the application."]
   (require '[trek.core :as app])
   (apply (resolve 'app/-main) args))
-
-(require '[adzerk.boot-test :refer [test]])

@@ -1,0 +1,13 @@
+statements = statement+;
+statement = line-number <ws> (assignment | print | if | goto) <'\n'>
+assignment = identifier <'='> expression
+print = <'PRINT'> <ws> string <','> identifier
+expression = number | identifier <'+'> number
+if = <'IF'> <ws> identifier <ws> '=' <ws> number <ws> <'THEN'> <ws> end;
+end = <'END'>;
+goto = <'GOTO'> <ws> line-number;
+identifier = 'I';
+line-number = #'[0-9]+';
+number = #'[0-9]+';
+string = '"HELLO"';
+<ws> = ' ';
