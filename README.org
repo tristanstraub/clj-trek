@@ -2,7 +2,7 @@
 boot run
 #+END_SRC
 
-#+BEGIN_QUOTE
+#+BEGIN_SRC
                           STAR TREK
 DO YOU WANT INSTRUCTIONS (THEY'RE LONG!)
      INSTRUCTIONS:
@@ -80,4 +80,4 @@ COMBAT AREA      CONDITION RED
                                         SHIELDS             0
 ---------------------------------
 COMMAND:
-#+END_QUOTE
+#+END_SRC
