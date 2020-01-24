@@ -2,16 +2,6 @@
   (:require [clojure.string :as str]
             [instaparse.core :as insta]))
 
-(defmacro defgrammar [grammar-name defrule]
-  `(do
-     (def ~grammar-name {})
-
-     (defmacro ~defrule [rule# & [args# & body#]]
-       `(do (alter-var-root #'~'~grammar-name
-                            assoc ~rule# (fn ~(or args# '[& _#])
-                                           ~@body#))
-            nil))))
-
 (defn rules [grammar]
   (->> grammar
        (map first)

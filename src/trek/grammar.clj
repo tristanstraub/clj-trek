@@ -5,8 +5,6 @@
 
 (def ^:dynamic *machine* nil)
 
-(rules/defgrammar basic defrule)
-
 (defn emit
   [statement-type & args]
   {:pre [*machine*]}
@@ -29,220 +27,224 @@
      (let [{:keys [parser transforms]} parser]
        (doall (rules/parse parser transforms listing start))))))
 
-(defrule "program = S (<\"\n\"> S)* <\"\n\"?>"
-  [statement & statements]
-  (emit :program `(~statement ~@statements)))
+(def basic
+  (merge
+   {"program = S (<\"\n\"> S)* <\"\n\"?>"
+    (fn
+      [statement & statements]
+      (emit :program `(~statement ~@statements)))}
 
-(defrule "S = line-number <ws+> statement <#';'?>"
-  [n s]
-  (emit :statement n s))
+   {"S = line-number <ws+> statement <#';'?>" (fn
+                                                [n s]
+                                                (emit :statement n s))}
 
-(defrule "line-number = #'[0-9]+'"
-  [n]
-  (Integer/parseInt n))
+   {"line-number = #'[0-9]+'" (fn
+                                [n]
+                                (Integer/parseInt n))}
 
-(defrule "statement = comment | gosub | print-using | print | input | if | assignment | dim | def | mat | for | goto | goto-of | next | image | return | end"
-  [s]
-  s)
+   {"statement = comment | gosub | print-using | print | input | if | assignment | dim | def | mat | for | goto | goto-of | next | image | return | end" (fn
+                                                                                                                                                           [s]
+                                                                                                                                                           s)}
 
-(defrule "print = <\"PRINT\"> <ws>* (! 'USING' (<ws> | expression | <\",\"> | <\";\">))* "
-  ([]
-   (emit :print))
-  ([& args]
-   (emit :print args)))
+   {"print = <\"PRINT\"> <ws>* (! 'USING' (<ws> | expression | <\",\"> | <\";\">))* " (fn
+                                                                                        ([]
+                                                                                         (emit :print))
+                                                                                        ([& args]
+                                                                                         (emit :print args)))}
 
-(defrule "print-using = <'PRINT'> <ws+> <'USING'> <ws> line-number (<';'> expression (<','> expression)*)?"
-  [line-number & expressions]
-  (emit :print-using [line-number expressions]))
+   {"print-using = <'PRINT'> <ws+> <'USING'> <ws> line-number (<';'> expression (<','> expression)*)?" (fn
+                                                                                                         [line-number & expressions]
+                                                                                                         (emit :print-using [line-number expressions]))}
 
-(defrule "goto = <\"GOTO\"> <ws> line-number"
-  [n]
-  (emit :goto n))
+   {"goto = <\"GOTO\"> <ws> line-number" (fn
+                                           [n]
+                                           (emit :goto n))}
 
-(defrule "goto-of = <\"GOTO\"> <ws> expression <ws> (<'OF'> <ws> line-number (<','> line-number)*)"
-  ([n]
-   (emit :goto n))
-  ([expression & line-numbers]
-   (emit :goto-of expression line-numbers)))
+   {"goto-of = <\"GOTO\"> <ws> expression <ws> (<'OF'> <ws> line-number (<','> line-number)*)" (fn
+                                                                                                 ([n]
+                                                                                                  (emit :goto n))
+                                                                                                 ([expression & line-numbers]
+                                                                                                  (emit :goto-of expression line-numbers)))}
 
-(defrule "gosub = <\"GOSUB\"> <ws> line-number"
-  [n]
-  (emit :gosub n))
+   {"gosub = <\"GOSUB\"> <ws> line-number" (fn
+                                             [n]
+                                             (emit :gosub n))}
 
-(defrule "return = <\"RETURN\">"
-  []
-  (emit :return))
+   {"return = <\"RETURN\">" (fn
+                              []
+                              (emit :return))}
 
-(defrule "for = <\"FOR\"> <ws> identifier <ws*> <'='> expression <ws> <'TO'> <ws> expression"
-  [identifier lower upper]
-  (emit :for identifier lower upper))
+   {"for = <\"FOR\"> <ws> identifier <ws*> <'='> expression <ws> <'TO'> <ws> expression" (fn
+                                                                                           [identifier lower upper]
+                                                                                           (emit :for identifier lower upper))}
 
-(defrule "expression = v-expression | m-expression | a-expression"
-  [v]
-  v)
+   {"expression = v-expression | m-expression | a-expression" (fn
+                                                                [v]
+                                                                v)}
 
-(defrule "v-expression = value | <'('> expression <')'> | h-expression"
-  ([v]
-   v))
+   {"v-expression = value | <'('> expression <')'> | h-expression" (fn
+                                                                     ([v]
+                                                                      v))}
 
-(defrule "a-expression = expression additive-op m-expression"
-  [left op right]
-  (emit :binary-operator left op right))
+   {"a-expression = expression additive-op m-expression" (fn
+                                                           [left op right]
+                                                           (emit :binary-operator left op right))}
 
-(defrule "m-expression = v-expression | m-expression multiplicative-op v-expression"
-  ([v]
-   v)
-  ([left op right]
-   (emit :binary-operator left op right)))
+   {"m-expression = v-expression | m-expression multiplicative-op v-expression" (fn
+                                                                                  ([v]
+                                                                                   v)
+                                                                                  ([left op right]
+                                                                                   (emit :binary-operator left op right)))}
 
-(defrule "h-expression = v-expression hat-op v-expression"
-  [left op right]
-  (emit :binary-operator left op right))
+   {"h-expression = v-expression hat-op v-expression" (fn
+                                                        [left op right]
+                                                        (emit :binary-operator left op right))}
 
-(defrule "additive-op = '+' | '-'"
-  [v]
-  v)
+   {"additive-op = '+' | '-'" (fn
+                                [v]
+                                v)}
 
-(defrule "multiplicative-op = '*' | '/'"
-  [v]
-  v)
+   {"multiplicative-op = '*' | '/'" (fn
+                                      [v]
+                                      v)}
 
-(defrule "hat-op = '^'"
-  [v]
-  v)
+   {"hat-op = '^'" (fn
+                     [v]
+                     v)}
 
-(defrule "quoted-string = <'\"'> #'[^\"]*' <'\"'>"
-  [v]
-  (emit :value v))
+   {"quoted-string = <'\"'> #'[^\"]*' <'\"'>" (fn
+                                                [v]
+                                                (emit :value v))}
 
-(defrule "value = function-call | quoted-string | integer | variable | decimal"
-  [x]
-  x)
+   {"value = function-call | quoted-string | integer | variable | decimal" (fn
+                                                                             [x]
+                                                                             x)}
 
-(defrule "integer = #'[-]?[0-9]+'"
-  [v]
-  (emit :value (Integer/parseInt v)))
+   {"integer = #'[-]?[0-9]+'" (fn
+                                [v]
+                                (emit :value (Integer/parseInt v)))}
 
-(defrule "ws = #'[ \t]'")
-(defrule "comment = <\"REM\" #'.*'>"
-  []
-  (emit :nop))
+   {"ws = #'[ \t]'" (fn [& _])}
 
-(defrule "input = <\"INPUT\"> <ws> identifier (<\",\"> identifier)*"
-  [input & inputs]
-  (emit :input `[~input ~@inputs]))
+   {"comment = <\"REM\" #'.*'>" (fn
+                                  []
+                                  (emit :nop))}
 
-(defrule "if = <\"IF\"> <ws> bool-expression <ws> <'THEN'> <ws> line-number"
-  [expression line-number]
-  (emit :if expression (emit :goto line-number)))
+   {"input = <\"INPUT\"> <ws> identifier (<\",\"> identifier)*" (fn
+                                                                  [input & inputs]
+                                                                  (emit :input `[~input ~@inputs]))}
+
+   {"if = <\"IF\"> <ws> bool-expression <ws> <'THEN'> <ws> line-number" (fn
+                                                                          [expression line-number]
+                                                                          (emit :if expression (emit :goto line-number)))}
 
 
 
-(defrule "variable = identifier | array-ref"
-  [v]
-  v)
+   {"variable = identifier | array-ref" (fn
+                                          [v]
+                                          v)}
 
-(defrule "next = <\"NEXT\"> <ws> identifier"
-  [identifier]
-  (emit :next identifier))
+   {"next = <\"NEXT\"> <ws> identifier" (fn
+                                          [identifier]
+                                          (emit :next identifier))}
 
-(defrule "bool-expression = expression <ws*> comparison-op <ws*> expression (<ws> bool-op <ws> bool-expression)?"
-  [a comparison-op b & [bool-op right]]
-  (let [left (emit :compare a comparison-op b)]
-    (if right
-      (emit :bool-op left bool-op right)
-      left)))
+   {"bool-expression = expression <ws*> comparison-op <ws*> expression (<ws> bool-op <ws> bool-expression)?" (fn
+                                                                                                               [a comparison-op b & [bool-op right]]
+                                                                                                               (let [left (emit :compare a comparison-op b)]
+                                                                                                                 (if right
+                                                                                                                   (emit :bool-op left bool-op right)
+                                                                                                                   left)))}
 
-(defrule "assignment = variable <'='> assignment-rhs"
-  [identifier rhs]
-  (emit :assign identifier rhs))
+   {"assignment = variable <'='> assignment-rhs" (fn
+                                                   [identifier rhs]
+                                                   (emit :assign identifier rhs))}
 
-(defrule "assignment-rhs = (expression | variable <'='> assignment-rhs)"
-  ([expression]
-   (emit :value expression))
-  ([identifier rhs]
-   (emit :assign identifier rhs)))
+   {"assignment-rhs = (expression | variable <'='> assignment-rhs)" (fn
+                                                                      ([expression]
+                                                                       (emit :value expression))
+                                                                      ([identifier rhs]
+                                                                       (emit :assign identifier rhs)))}
 
-(defrule "dim = <\"DIM\" ws> array-defs"
-  [array-defs]
-  (emit :dim array-defs))
+   {"dim = <\"DIM\" ws> array-defs" (fn
+                                      [array-defs]
+                                      (emit :dim array-defs))}
 
-(defrule "identifier = #'[A-Z][A-Z0-9]*[$]?'"
-  [identifier]
-  (emit :identifier identifier))
+   {"identifier = #'[A-Z][A-Z0-9]*[$]?'" (fn
+                                           [identifier]
+                                           (emit :identifier identifier))}
 
-(defrule "array-ref = identifier <'['> array-indices <']'>"
-  [identifier indices]
-  (emit :array-ref identifier indices))
+   {"array-ref = identifier <'['> array-indices <']'>" (fn
+                                                         [identifier indices]
+                                                         (emit :array-ref identifier indices))}
 
-(defrule "array-indices = expression (<','> expression)*"
-  [& indices]
-  indices)
+   {"array-indices = expression (<','> expression)*" (fn
+                                                       [& indices]
+                                                       indices)}
 
-(defrule "array-def = identifier <'['> dimensions <']'>"
-  [identifier dimensions]
-  (emit :array-ref identifier dimensions))
+   {"array-def = identifier <'['> dimensions <']'>" (fn
+                                                      [identifier dimensions]
+                                                      (emit :array-ref identifier dimensions))}
 
-(defrule "dimensions = integer (<','> integer)*"
-  [& dimensions]
-  dimensions)
+   {"dimensions = integer (<','> integer)*" (fn
+                                              [& dimensions]
+                                              dimensions)}
 
-(defrule "array-defs = array-def (<#','> array-ref)*"
-  [& array-defs]
-  array-defs)
+   {"array-defs = array-def (<#','> array-ref)*" (fn
+                                                   [& array-defs]
+                                                   array-defs)}
 
-(defrule "function-call = function-name <'('> expression <')'>"
-  [fn-name arg]
-  (emit :call fn-name arg))
+   {"function-call = function-name <'('> expression <')'>" (fn
+                                                             [fn-name arg]
+                                                             (emit :call fn-name arg))}
 
-(defrule "function-name = #'[A-Z]+'"
-  [name]
-  name)
+   {"function-name = #'[A-Z]+'" (fn
+                                  [name]
+                                  name)}
 
-(defrule "comparison-op = #'<>' | '>' | '<=' | '<' | '=' | '>='"
-  [op]
-  op)
+   {"comparison-op = #'<>' | '>' | '<=' | '<' | '=' | '>='" (fn
+                                                              [op]
+                                                              op)}
 
-(defrule "decimal = #'[0-9]*' '.'? #'[0-9]+'"
-  [& values]
-  (emit :value (Float/parseFloat (apply str values))))
+   {"decimal = #'[0-9]*' '.'? #'[0-9]+'" (fn
+                                           [& values]
+                                           (emit :value (Float/parseFloat (apply str values))))}
 
-(defrule "end = <\"END\">"
-  []
-  (emit :nop))
+   {"end = <\"END\">" (fn
+                        []
+                        (emit :nop))}
 
-(defrule "def = <\"DEF\" ws> identifier <'('> identifier <')' '='> expression"
-  [fn-name fn-arg expression]
-  (emit :def fn-name fn-arg expression))
+   {"def = <\"DEF\" ws> identifier <'('> identifier <')' '='> expression" (fn
+                                                                            [fn-name fn-arg expression]
+                                                                            (emit :def fn-name fn-arg expression))}
 
-(defrule "mat = <\"MAT\" ws> identifier <'=ZER'>"
-  [identifier]
-  (emit :zero-array identifier))
+   {"mat = <\"MAT\" ws> identifier <'=ZER'>" (fn
+                                               [identifier]
+                                               (emit :zero-array identifier))}
 
-(defrule "bool-op = <'OR'>"
-  []
-  :or)
+   {"bool-op = <'OR'>" (fn
+                         []
+                         :or)}
 
-(defrule "image = <\"IMAGE\"> <ws+> formatter-list"
-  [fl]
-  fl)
+   {"image = <\"IMAGE\"> <ws+> formatter-list" (fn
+                                                 [fl]
+                                                 fl)}
 
-(defrule "formatter-list = formatter (<','> formatter)*"
-  [a & bs]
-  (apply emit :formatter-list `[~a ~@bs]))
+   {"formatter-list = formatter (<','> formatter)*" (fn
+                                                      [a & bs]
+                                                      (apply emit :formatter-list `[~a ~@bs]))}
 
-(defrule "formatter = format-count format-type | quoted-string | format-type | (format-count \"(\" formatter-list \")\")"
-  ([number type]
-   (emit :format-type (str number (first (emitted type)))))
-  ([type]
-   type)
-  ([number _ format-list _]
-   (emit :format-repeat number format-list)))
+   {"formatter = format-count format-type | quoted-string | format-type | (format-count \"(\" formatter-list \")\")" (fn
+                                                                                                                       ([number type]
+                                                                                                                        (emit :format-type (str number (first (emitted type)))))
+                                                                                                                       ([type]
+                                                                                                                        type)
+                                                                                                                       ([number _ format-list _]
+                                                                                                                        (emit :format-repeat number format-list)))}
 
-(defrule "format-count = #'[-]?[0-9]+'"
-  [number]
-  (Integer/parseInt number))
+   {"format-count = #'[-]?[0-9]+'" (fn
+                                     [number]
+                                     (Integer/parseInt number))}
 
-(defrule "format-type = \"D\" | \"X\" | \"A\""
-  [type]
-  (emit :format-type type))
+   {"format-type = \"D\" | \"X\" | \"A\"" (fn
+                                            [type]
+                                            (emit :format-type type))}))
