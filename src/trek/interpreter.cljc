@@ -9,7 +9,9 @@
             #?(:clj [clj-time.local :as time.local]
                :cljs [cljs-time.local :as time.local])
             [clojure.string :as str]
-            [trek.machine :as machine])
+            [trek.machine :as machine]
+            #?(:clj [clj.pprint :refer [cl-format]]
+               :cljs [cljs.pprint :refer [cl-format]]))
   #?(:clj (:import java.lang.Math)))
 
 (defn parse-int
@@ -541,11 +543,6 @@
   [machine formatter]
   (last-value machine (first (machine/emitted machine formatter))))
 
-(defn fmt
-  [& args]
-  #?(:clj (apply format args)
-     :cljs ":unformatted:"))
-
 (defmethod machine/formatter [:interpreter :format-type]
   [machine formatter]
   (let [[format-type] (machine/emitted machine formatter)
@@ -561,10 +558,10 @@
                         \x (last-value machine (apply str (repeat format-count (str " "))))
 
                         \a (last-value (update machine :unformatted pop)
-                                       (fmt (str "%" format-count "s") value))
+                                       (cl-format true (str "~" format-count "S") value))
 
                         \d (last-value (update machine :unformatted pop)
-                                       (fmt (str "%" format-count "d") (int value))))]
+                                       (cl-format true (str "~" format-count "D") (int value))))]
     machine))
 
 (defn format-list [machine formatter]
