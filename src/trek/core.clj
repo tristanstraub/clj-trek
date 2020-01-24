@@ -4,7 +4,8 @@
             [trek.interpreter :as interpreter]
             [trek.rules :as rules]
             [clojure.string :as str]
-            [trek.machine :as machine]))
+            [trek.machine :as machine]
+            [trek.async :as async]))
 
 (defonce history (atom nil))
 (defonce machine (atom nil))
@@ -79,24 +80,24 @@
   ([]
    (step! 1))
   ([n]
-   (doseq [i (range n)]
-     (swap! history conj @machine)
-     (try (swap! machine machine/step)
-          (catch Exception e
-            (swap! history pop)
-            (throw e)))
+   (async/go?
+     (doseq [i (range n)]
+       (swap! history conj @machine)
 
-     (print-next))))
+       (reset! machine (async/<? (machine/step @machine)))
+
+       (print-next)))))
 
 (defn until!
   [line-number]
   (while (not= (:ptr @machine) line-number)
-    (step!)))
+    (async/<? (step!))))
 
 (defn continue!
   []
-  (while true
-    (step!)))
+  (async/go?
+   (while true
+     (async/<? (step!)))))
 
 (defn back!
   []
@@ -107,11 +108,11 @@
 (defn retry!
   []
   (back!)
-  (step!))
+  (async/<?? (step!)))
 
 (defn -main [& argv]
   (start!)
-  (continue!))
+  (async/<?? (continue!)))
 
 (comment (grammar/parse (grammar/parser)
                         (interpreter/interpreter)

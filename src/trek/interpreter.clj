@@ -4,7 +4,8 @@
    [clj-time.local :as time.local]
    [clojure.string :as str]
    [trek.machine :as machine]
-   [clojure.core.async :as a])
+   [clojure.core.async :as a]
+   [clojure.core.async :as async])
   (:import java.lang.Math))
 
 (def ^:dynamic *line-number* nil)
@@ -42,34 +43,33 @@
 
 (defmethod machine/step :interpreter
   [machine]
-  (a/<!!
-   (a/go
-     (assert (number? (:ptr machine)) "machine/step:interpreter")
-     (let [{:keys [lines]} (:program machine)
-           line            (get lines (:ptr machine))]
-       (reset! last-machine {:line line
-                             :machine machine})
-       (assert line (:ptr machine))
-       (binding [*line-number* (:ptr machine)]
-         (as->
-             (machine/evaluate machine line)
-             machine
-             (cond-> machine
-               (:goto machine)
-               (-> (assoc :ptr (:goto machine))
-                   (dissoc :goto))
+  (a/go
+    (assert (number? (:ptr machine)) "machine/step:interpreter")
+    (let [{:keys [lines]} (:program machine)
+          line            (get lines (:ptr machine))]
+      (reset! last-machine {:line line
+                            :machine machine})
+      (assert line (:ptr machine))
+      (binding [*line-number* (:ptr machine)]
+        (as->
+            (machine/evaluate machine line)
+            machine
+          (cond-> machine
+            (:goto machine)
+            (-> (assoc :ptr (:goto machine))
+                (dissoc :goto))
 
-               (not (:goto machine))
-               (as-> machine
-                   (do (assert (number? (next-line machine)))
-                       (assoc machine :ptr (next-line machine))))
+            (not (:goto machine))
+            (as-> machine
+                (do (assert (number? (next-line machine)))
+                    (assoc machine :ptr (next-line machine))))
 
-               true
-               (as-> machine
-                   (loop [tasks (:async machine) machine machine]
-                     (if-let [task (first tasks)]
-                       (recur (rest tasks) (a/<! (task machine)))
-                       (dissoc machine :async)))))))))))
+            true
+            (as-> machine
+                (loop [tasks (:async machine) machine machine]
+                  (if-let [task (first tasks)]
+                    (recur (rest tasks) (a/<! (task machine)))
+                    (dissoc machine :async))))))))))
 
 (defn goto [machine n]
   {:pre [(number? n)]}
