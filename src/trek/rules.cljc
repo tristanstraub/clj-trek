@@ -7,10 +7,10 @@
        (map first)
        (str/join ";\n")))
 
-(defn transforms [grammar]
+(defn transforms [grammar machine]
   (->> grammar
        (map (fn [[rule transform]]
-              [(keyword (first (str/split rule #" "))) transform]))
+              [(keyword (first (str/split rule #" "))) (partial transform machine)]))
        (into {})))
 
 (defn parser [grammar]

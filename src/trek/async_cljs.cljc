@@ -1,20 +1,21 @@
-(ns trek.async)
+(ns trek.async-cljs)
 
 (defmacro go? [& body]
-  `(clojure.core.async/go
+  `(cljs.core.async/go
      (try ~@body
-          (catch #?(:clj Throwable :cljs js/Error) t#
+          (catch js/Error t#
+            (.warn js/console t#)
             t#))))
 
 (defmacro <? [& args]
-  `(let [value# (clojure.core.async/<! ~@args)]
-     (when (instance? #?(:clj Throwable :cljs js/Error) value#)
+  `(let [value# (cljs.core.async/<! ~@args)]
+     (when (instance? js/Error value#)
        (throw value#))
      value#))
 
 #?(:clj
    (defmacro <?? [& args]
-     `(let [value# (clojure.core.async/<!! ~@args)]
+     `(let [value# (cljs.core.async/<!! ~@args)]
         (when (instance? #?(:clj Throwable :cljs js/Error) value#)
           (throw value#))
         value#)))

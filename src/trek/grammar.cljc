@@ -3,16 +3,14 @@
             [trek.rules :as rules]
             [clojure.string :as str]))
 
-(def ^:dynamic *machine* nil)
-
 (defn emit
-  [statement-type & args]
-  {:pre [*machine*]}
-  (machine/emit *machine* statement-type args))
+  [machine statement-type & args]
+  {:pre [machine]}
+  (machine/emit machine statement-type args))
 
 (defn emitted
-  [type]
-  (machine/emitted *machine* type))
+  [machine type]
+  (machine/emitted machine type))
 
 (defn parse-int
   [v]
@@ -28,235 +26,235 @@
   (merge
    {"program = S (<\"\n\"> S)* <\"\n\"?>"
     (fn
-      [statement & statements]
-      (emit :program `(~statement ~@statements)))}
+      [machine statement & statements]
+      (emit machine :program `(~statement ~@statements)))}
 
    {"S = line-number <ws+> statement <#';'?>" (fn
-                                                [n s]
-                                                (emit :statement n s))}
+                                                [machine n s]
+                                                (emit machine :statement n s))}
 
    {"line-number = #'[0-9]+'" (fn
-                                [n]
+                                [machine n]
                                 (parse-int n))}
 
    {"statement = comment | gosub | print-using | print | input | if | assignment | dim | def | mat | for | goto | goto-of | next | image | return | end" (fn
-                                                                                                                                                           [s]
+                                                                                                                                                           [machine s]
                                                                                                                                                            s)}
 
    {"print = <\"PRINT\"> <ws>* (! 'USING' (<ws> | expression | <\",\"> | <\";\">))* " (fn
-                                                                                        ([]
-                                                                                         (emit :print))
-                                                                                        ([& args]
-                                                                                         (emit :print args)))}
+                                                                                        ([machine]
+                                                                                         (emit machine :print))
+                                                                                        ([machine & args]
+                                                                                         (emit machine :print args)))}
 
    {"print-using = <'PRINT'> <ws+> <'USING'> <ws> line-number (<';'> expression (<','> expression)*)?" (fn
-                                                                                                         [line-number & expressions]
-                                                                                                         (emit :print-using [line-number expressions]))}
+                                                                                                         [machine line-number & expressions]
+                                                                                                         (emit machine :print-using [line-number expressions]))}
 
    {"goto = <\"GOTO\"> <ws> line-number" (fn
-                                           [n]
+                                           [machine n]
                                            (assert (number? n))
-                                           (emit :goto n))}
+                                           (emit machine :goto n))}
 
    {"goto-of = <\"GOTO\"> <ws> expression <ws> (<'OF'> <ws> line-number (<','> line-number)*)" (fn
-                                                                                                 ([n]
-                                                                                                  (emit :goto n))
-                                                                                                 ([expression & line-numbers]
-                                                                                                  (emit :goto-of expression line-numbers)))}
+                                                                                                 ([machine n]
+                                                                                                  (emit machine :goto n))
+                                                                                                 ([machine expression & line-numbers]
+                                                                                                  (emit machine :goto-of expression line-numbers)))}
 
    {"gosub = <\"GOSUB\"> <ws> line-number" (fn
-                                             [n]
+                                             [machine n]
                                              (assert (number? n) "parse:gosub")
-                                             (emit :gosub n))}
+                                             (emit machine :gosub n))}
 
    {"return = <\"RETURN\">" (fn
-                              []
-                              (emit :return))}
+                              [machine]
+                              (emit machine :return))}
 
    {"for = <\"FOR\"> <ws> identifier <ws*> <'='> expression <ws> <'TO'> <ws> expression" (fn
-                                                                                           [identifier lower upper]
-                                                                                           (emit :for identifier lower upper))}
+                                                                                           [machine identifier lower upper]
+                                                                                           (emit machine :for identifier lower upper))}
 
    {"expression = v-expression | m-expression | a-expression" (fn
-                                                                [v]
+                                                                [machine v]
                                                                 v)}
 
    {"v-expression = value | <'('> expression <')'> | h-expression" (fn
-                                                                     ([v]
+                                                                     ([machine v]
                                                                       v))}
 
    {"a-expression = expression additive-op m-expression" (fn
-                                                           [left op right]
-                                                           (emit :binary-operator left op right))}
+                                                           [machine left op right]
+                                                           (emit machine :binary-operator left op right))}
 
    {"m-expression = v-expression | m-expression multiplicative-op v-expression" (fn
-                                                                                  ([v]
+                                                                                  ([machine v]
                                                                                    v)
-                                                                                  ([left op right]
-                                                                                   (emit :binary-operator left op right)))}
+                                                                                  ([machine left op right]
+                                                                                   (emit machine :binary-operator left op right)))}
 
    {"h-expression = v-expression hat-op v-expression" (fn
-                                                        [left op right]
-                                                        (emit :binary-operator left op right))}
+                                                        [machine left op right]
+                                                        (emit machine :binary-operator left op right))}
 
    {"additive-op = '+' | '-'" (fn
-                                [v]
+                                [machine v]
                                 v)}
 
    {"multiplicative-op = '*' | '/'" (fn
-                                      [v]
+                                      [machine v]
                                       v)}
 
    {"hat-op = '^'" (fn
-                     [v]
+                     [machine v]
                      v)}
 
    {"quoted-string = <'\"'> #'[^\"]*' <'\"'>" (fn
-                                                [v]
-                                                (emit :value v))}
+                                                [machine v]
+                                                (emit machine :value v))}
 
    {"value = function-call | quoted-string | integer | variable | decimal" (fn
-                                                                             [x]
+                                                                             [machine x]
                                                                              x)}
 
    {"integer = #'[-]?[0-9]+'" (fn
-                                [v]
-                                (emit :value (parse-int v)))}
+                                [machine v]
+                                (emit machine :value (parse-int v)))}
 
    {"ws = #'[ \t]'" (fn [& _])}
 
    {"comment = <\"REM\" #'.*'>" (fn
-                                  []
-                                  (emit :nop))}
+                                  [machine]
+                                  (emit machine :nop))}
 
    {"input = <\"INPUT\"> <ws> identifier (<\",\"> identifier)*" (fn
-                                                                  [input & inputs]
-                                                                  (emit :input `[~input ~@inputs]))}
+                                                                  [machine input & inputs]
+                                                                  (emit machine :input `[~input ~@inputs]))}
 
    {"if = <\"IF\"> <ws> bool-expression <ws> <'THEN'> <ws> line-number" (fn
-                                                                          [expression line-number]
-                                                                          (emit :if expression (emit :goto line-number)))}
+                                                                          [machine expression line-number]
+                                                                          (emit machine :if expression (emit machine :goto line-number)))}
 
 
 
    {"variable = identifier | array-ref" (fn
-                                          [v]
+                                          [machine v]
                                           v)}
 
    {"next = <\"NEXT\"> <ws> identifier" (fn
-                                          [identifier]
-                                          (emit :next identifier))}
+                                          [machine identifier]
+                                          (emit machine :next identifier))}
 
    {"bool-expression = expression <ws*> comparison-op <ws*> expression (<ws> bool-op <ws> bool-expression)?" (fn
-                                                                                                               [a comparison-op b & [bool-op right]]
-                                                                                                               (let [left (emit :compare a comparison-op b)]
+                                                                                                               [machine a comparison-op b & [bool-op right]]
+                                                                                                               (let [left (emit machine :compare a comparison-op b)]
                                                                                                                  (if right
-                                                                                                                   (emit :bool-op left bool-op right)
+                                                                                                                   (emit machine :bool-op left bool-op right)
                                                                                                                    left)))}
 
    {"assignment = variable <'='> assignment-rhs" (fn
-                                                   [identifier rhs]
-                                                   (emit :assign identifier rhs))}
+                                                   [machine identifier rhs]
+                                                   (emit machine :assign identifier rhs))}
 
    {"assignment-rhs = (expression | variable <'='> assignment-rhs)" (fn
-                                                                      ([expression]
-                                                                       (emit :value expression))
-                                                                      ([identifier rhs]
-                                                                       (emit :assign identifier rhs)))}
+                                                                      ([machine expression]
+                                                                       (emit machine :value expression))
+                                                                      ([machine identifier rhs]
+                                                                       (emit machine :assign identifier rhs)))}
 
    {"dim = <\"DIM\" ws> array-defs" (fn
-                                      [array-defs]
-                                      (emit :dim array-defs))}
+                                      [machine array-defs]
+                                      (emit machine :dim array-defs))}
 
    {"identifier = #'[A-Z][A-Z0-9]*[$]?'" (fn
-                                           [identifier]
-                                           (emit :identifier identifier))}
+                                           [machine identifier]
+                                           (emit machine :identifier identifier))}
 
    {"array-ref = identifier <'['> array-indices <']'>" (fn
-                                                         [identifier indices]
-                                                         (emit :array-ref identifier indices))}
+                                                         [machine identifier indices]
+                                                         (emit machine :array-ref identifier indices))}
 
    {"array-indices = expression (<','> expression)*" (fn
-                                                       [& indices]
+                                                       [machine & indices]
                                                        indices)}
 
    {"array-def = identifier <'['> dimensions <']'>" (fn
-                                                      [identifier dimensions]
-                                                      (emit :array-ref identifier dimensions))}
+                                                      [machine identifier dimensions]
+                                                      (emit machine :array-ref identifier dimensions))}
 
    {"dimensions = integer (<','> integer)*" (fn
-                                              [& dimensions]
+                                              [machine & dimensions]
                                               dimensions)}
 
    {"array-defs = array-def (<#','> array-ref)*" (fn
-                                                   [& array-defs]
+                                                   [machine & array-defs]
                                                    array-defs)}
 
    {"function-call = function-name <'('> expression <')'>" (fn
-                                                             [fn-name arg]
-                                                             (emit :call fn-name arg))}
+                                                             [machine fn-name arg]
+                                                             (emit machine :call fn-name arg))}
 
    {"function-name = #'[A-Z]+'" (fn
-                                  [name]
+                                  [machine name]
                                   name)}
 
    {"comparison-op = #'<>' | '>' | '<=' | '<' | '=' | '>='" (fn
-                                                              [op]
+                                                              [machine op]
                                                               op)}
 
    {"decimal = #'[0-9]*' '.'? #'[0-9]+'" (fn
-                                           [& values]
-                                           (emit :value (parse-float (apply str values))))}
+                                           [machine & values]
+                                           (emit machine :value (parse-float (apply str values))))}
 
    {"end = <\"END\">" (fn
-                        []
-                        (emit :nop))}
+                        [machine]
+                        (emit machine :nop))}
 
    {"def = <\"DEF\" ws> identifier <'('> identifier <')' '='> expression" (fn
-                                                                            [fn-name fn-arg expression]
-                                                                            (emit :def fn-name fn-arg expression))}
+                                                                            [machine fn-name fn-arg expression]
+                                                                            (emit machine :def fn-name fn-arg expression))}
 
    {"mat = <\"MAT\" ws> identifier <'=ZER'>" (fn
-                                               [identifier]
-                                               (emit :zero-array identifier))}
+                                               [machine identifier]
+                                               (emit machine :zero-array identifier))}
 
    {"bool-op = <'OR'>" (fn
-                         []
+                         [machine]
                          :or)}
 
    {"image = <\"IMAGE\"> <ws+> formatter-list" (fn
-                                                 [fl]
+                                                 [machine fl]
                                                  fl)}
 
    {"formatter-list = formatter (<','> formatter)*" (fn
-                                                      [a & bs]
-                                                      (apply emit :formatter-list `[~a ~@bs]))}
+                                                      [machine a & bs]
+                                                      (apply emit machine :formatter-list `[~a ~@bs]))}
 
    {"formatter = format-count format-type | quoted-string | format-type | (format-count \"(\" formatter-list \")\")" (fn
-                                                                                                                       ([number type]
-                                                                                                                        (emit :format-type (str number (first (emitted type)))))
-                                                                                                                       ([type]
+                                                                                                                       ([machine number type]
+                                                                                                                        (emit machine :format-type (str number (first (emitted machine type)))))
+                                                                                                                       ([machine type]
                                                                                                                         type)
-                                                                                                                       ([number _ format-list _]
-                                                                                                                        (emit :format-repeat number format-list)))}
+                                                                                                                       ([machine number _ format-list _]
+                                                                                                                        (emit machine :format-repeat number format-list)))}
 
    {"format-count = #'[-]?[0-9]+'" (fn
-                                     [number]
+                                     [machine number]
                                      (parse-int number))}
 
    {"format-type = \"D\" | \"X\" | \"A\"" (fn
-                                            [type]
-                                            (emit :format-type type))}))
+                                            [machine type]
+                                            (emit machine :format-type type))}))
 
-(defn parser []
+(defn parser
+  [machine]
   {:parser     (rules/parser basic)
-   :transforms (rules/transforms basic)})
+   :transforms (rules/transforms basic machine)})
 
 (defn parse
   ([parser machine listing]
    (parse parse machine listing :program))
   ([parser machine listing start]
    {:pre [machine]}
-   (binding [*machine* machine]
-     (let [{:keys [parser transforms]} parser]
-       (doall (rules/parse parser transforms listing start))))))
+   (let [{:keys [parser transforms]} parser]
+     (doall (rules/parse parser transforms listing start)))))

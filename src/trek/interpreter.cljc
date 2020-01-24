@@ -1,7 +1,9 @@
 (ns trek.interpreter
-  #?(:cljs (:require-macros [cljs.core.async :as a]))
-  (:require #?(:clj [clojure.core.async :as a]
-               :cljs [cljs.core.async :as a])
+  #?(:cljs (:require-macros [cljs.core.async]
+                            [trek.async-cljs :as async]))
+  (:require #?(:clj [trek.async :as async])
+            #?(:clj [clojure.core.async]
+               :cljs [cljs.core.async])
             #?(:clj [clj-time.core :as time.core]
                :cljs [cljs-time.core :as time.core])
             #?(:clj [clj-time.local :as time.local]
@@ -9,8 +11,6 @@
             [clojure.string :as str]
             [trek.machine :as machine])
   #?(:clj (:import java.lang.Math)))
-
-(def ^:dynamic *line-number* nil)
 
 (defn parse-int
   [v]
@@ -50,33 +50,30 @@
 
 (defmethod machine/step :interpreter
   [machine]
-  (a/go
-    (assert (number? (:ptr machine)) "machine/step:interpreter")
-    (let [{:keys [lines]} (:program machine)
-          line            (get lines (:ptr machine))]
-      (reset! last-machine {:line line
-                            :machine machine})
-      (assert line (:ptr machine))
-      (binding [*line-number* (:ptr machine)]
-        (as->
-            (machine/evaluate machine line)
-            machine
-          (cond-> machine
-            (:goto machine)
-            (-> (assoc :ptr (:goto machine))
-                (dissoc :goto))
+  (async/go?
+   (assert (number? (:ptr machine)) "machine/step:interpreter")
+   (let [{:keys [lines]} (:program machine)
+         line            (get lines (:ptr machine))]
+     (reset! last-machine {:line line
+                           :machine machine})
+     (assert line (:ptr machine))
+     (as-> (machine/evaluate machine line) machine
+       (cond-> machine
+         (:goto machine)
+         (-> (assoc :ptr (:goto machine))
+             (dissoc :goto))
 
-            (not (:goto machine))
-            (as-> machine
-                (do (assert (number? (next-line machine)))
-                    (assoc machine :ptr (next-line machine))))
+         (not (:goto machine))
+         (as-> machine
+             (do (assert (number? (next-line machine)))
+                 (assoc machine :ptr (next-line machine))))
 
-            true
-            (as-> machine
-                (loop [tasks (:async machine) machine machine]
-                  (if-let [task (first tasks)]
-                    (recur (rest tasks) (a/<! (task machine)))
-                    (dissoc machine :async))))))))))
+         true
+         (as-> machine
+             (loop [tasks (:async machine) machine machine]
+               (if-let [task (first tasks)]
+                 (recur (rest tasks) (async/<? (task machine)))
+                 (dissoc machine :async)))))))))
 
 (defn goto [machine n]
   {:pre [(number? n)]}
@@ -126,6 +123,7 @@
   [statement-type eval-fn]
   (defmethod machine/emit [:interpreter statement-type]
     [machine statement-type args]
+    {:pre [(keyword? statement-type)]}
     {:type statement-type
      :args args})
 
@@ -217,10 +215,9 @@
     (let [lower-value (last-value (machine/evaluate machine lower))
           upper-value (last-value (machine/evaluate machine upper))
           identifier  (first (machine/emitted machine identifier))]
-      (assert *line-number*)
       (-> machine
           (update :for assoc identifier {:bounds [lower-value upper-value]
-                                         :line-number *line-number*})
+                                         :line-number (:ptr machine)})
           (update :env assoc identifier lower-value)))))
 
 (defeval :next
@@ -274,22 +271,34 @@
 
     (throw (ex-info "Not an integer" {:value value :id id}))))
 
-#?(:cljs (defn read-line
-           []
-           ""))
+(def line-input
+  #?(:clj (clojure.core.async/chan)
+     :cljs (cljs.core.async/chan)))
+
+#?(:cljs (defn send-input
+           [value]
+           (println :sent value)
+           (cljs.core.async/put! line-input value)))
 
 (defn get-input [machin inputs]
-  (loop [mac machin
-         inputs inputs]
-    (if-let [input (first inputs)]
-      (let [id (first (machine/emitted mac (first inputs)))]
-        (recur (assoc-in mac [:env id] (convert-input id (read-line)))
-               (rest inputs)))
-      mac)))
+  (println :get-input)
+
+  (async/go?
+   (loop [mac machin
+          inputs inputs]
+     (if-let [input (first inputs)]
+       (let [id (first (machine/emitted mac (first inputs)))]
+         (recur (assoc-in mac [:env id] (convert-input id
+                                                       #?(:clj (read-line)
+                                                          :cljs (do
+                                                                  (println :read-line)
+                                                                  (async/<? line-input)))))
+                (rest inputs)))
+       mac))))
 
 (defeval :input
   (fn [machine inputs]
-    (async machine #(a/go (get-input % inputs)))))
+    (async machine #(get-input % inputs))))
 
 ;; -- IF
 

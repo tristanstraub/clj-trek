@@ -1,15 +1,16 @@
 (ns trek.core
   #?(:cljs (:require-macros [trek.sttr :as sttr]
-                            [cljs.core.async :as a]))
-  (:require  #?(:clj [clojure.core.async :as a]
-                :cljs [cljs.core.async :as a])
+                            [cljs.core.async]
+                            [trek.async-cljs :as async]))
+  (:require  #?(:clj [clojure.core.async]
+                :cljs [cljs.core.async])
              #?(:clj [trek.sttr :as sttr])
+             #?(:clj [trek.async :as async])
             [trek.grammar :as grammar]
             [trek.interpreter :as interpreter]
             [trek.rules :as rules]
             [clojure.string :as str]
-            [trek.machine :as machine]
-            [trek.async :as async]))
+            [trek.machine :as machine]))
 
 (defonce history (atom nil))
 (defonce machine (atom nil))
@@ -37,13 +38,13 @@
   nil)
 
 (defn parse*
-  ([content]
+  ([machine content]
    (parse* content :program))
-  ([content start]
-   (grammar/parse (grammar/parser) (interpreter/interpreter) content start)))
+  ([machine content start]
+   (grammar/parse (grammar/parser machine) (interpreter/interpreter) content start)))
 
 (defn load-program* [machine content]
-  (let [program (grammar/parse (grammar/parser) machine content :program)]
+  (let [program (grammar/parse (grammar/parser machine) machine content :program)]
 
     (-> machine
         (assoc :source (-> content
@@ -72,7 +73,7 @@
    (:env @machine))
   ([k]
    (-> @machine
-       (machine/evaluate (parse* k :expression))
+       (machine/evaluate (parse* @machine k :expression))
        interpreter/last-value)))
 
 #?(:clj
@@ -92,23 +93,26 @@
    (step! 1))
   ([n]
    (async/go?
-     (doseq [i (range n)]
-       (swap! history conj @machine)
+    (doseq [i (range n)]
+      (swap! history conj @machine)
 
-       (reset! machine (async/<? (machine/step @machine)))
+      (reset! machine (async/<? (machine/step @machine)))
 
-       (print-next)))))
+      (print-next)))))
 
 (defn until!
   [line-number]
-  (while (not= (:ptr @machine) line-number)
-    (async/<? (step!))))
+  (async/go?
+   (while (not= (:ptr @machine) line-number)
+     (async/<? (step!)))))
 
 (defn continue!
   []
   (async/go?
    (while true
-     (async/<? (step!)))))
+     (let [e (async/<? (step!))]
+       (when (ex-data e)
+         (println e))))))
 
 (defn back!
   []
