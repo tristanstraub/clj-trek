@@ -14,6 +14,16 @@
   [type]
   (machine/emitted *machine* type))
 
+(defn parse-int
+  [v]
+  #?(:clj (Integer/parseInt v)
+     :cljs (js/parseInt v)))
+
+(defn parse-float
+  [v]
+  #?(:clj (Float/parseFloat v)
+     :cljs (js/parseFloat v)))
+
 (def basic
   (merge
    {"program = S (<\"\n\"> S)* <\"\n\"?>"
@@ -27,7 +37,7 @@
 
    {"line-number = #'[0-9]+'" (fn
                                 [n]
-                                (Integer/parseInt n))}
+                                (parse-int n))}
 
    {"statement = comment | gosub | print-using | print | input | if | assignment | dim | def | mat | for | goto | goto-of | next | image | return | end" (fn
                                                                                                                                                            [s]
@@ -111,7 +121,7 @@
 
    {"integer = #'[-]?[0-9]+'" (fn
                                 [v]
-                                (emit :value (Integer/parseInt v)))}
+                                (emit :value (parse-int v)))}
 
    {"ws = #'[ \t]'" (fn [& _])}
 
@@ -196,7 +206,7 @@
 
    {"decimal = #'[0-9]*' '.'? #'[0-9]+'" (fn
                                            [& values]
-                                           (emit :value (Float/parseFloat (apply str values))))}
+                                           (emit :value (parse-float (apply str values))))}
 
    {"end = <\"END\">" (fn
                         []
@@ -232,7 +242,7 @@
 
    {"format-count = #'[-]?[0-9]+'" (fn
                                      [number]
-                                     (Integer/parseInt number))}
+                                     (parse-int number))}
 
    {"format-type = \"D\" | \"X\" | \"A\"" (fn
                                             [type]

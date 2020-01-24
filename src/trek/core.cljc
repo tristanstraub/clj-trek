@@ -1,5 +1,9 @@
 (ns trek.core
-  (:require [clojure.java.io :as io]
+  #?(:cljs (:require-macros [trek.sttr :as sttr]
+                            [cljs.core.async :as a]))
+  (:require  #?(:clj [clojure.core.async :as a]
+                :cljs [cljs.core.async :as a])
+             #?(:clj [trek.sttr :as sttr])
             [trek.grammar :as grammar]
             [trek.interpreter :as interpreter]
             [trek.rules :as rules]
@@ -9,6 +13,11 @@
 
 (defonce history (atom nil))
 (defonce machine (atom nil))
+
+(defn parse-int
+  [v]
+  #?(:clj (Integer/parseInt v)
+     :cljs (js/parseInt v)))
 
 (defn line
   ([]
@@ -20,10 +29,11 @@
 
 (defn print-next []
   (when *debug*
-    (clojure.pprint/pprint [:env (:env @machine)
-                            :stack (:stack @machine)
-                            :ptr (:ptr @machine)
-                            "Next:" (line)]))
+    (#?(:clj clojure.pprint/pprint :cljs println)
+     [:env (:env @machine)
+      :stack (:stack @machine)
+      :ptr (:ptr @machine)
+      "Next:" (line)]))
   nil)
 
 (defn parse*
@@ -38,12 +48,12 @@
     (-> machine
         (assoc :source (-> content
                            (str/split #"\n")
-                           (->> (map (fn [line] [(Integer/parseInt (re-find #"^[0-9]+" line)) line]))
+                           (->> (map (fn [line] [(parse-int (re-find #"^[0-9]+" line)) line]))
                                 (into {}))))
         (machine/load-program program))))
 
-(defn load-program [machine file]
-  (load-program* machine (slurp file)))
+(defn load-program [machine content]
+  (load-program* machine content))
 
 (defn start*
   [content]
@@ -52,9 +62,9 @@
 
 (defn start!
   ([]
-   (start! (io/resource "sttr1.txt")))
-  ([file]
-   (start* (slurp file))
+   (start! (sttr/txt)))
+  ([content]
+   (start* content)
    (print-next)))
 
 (defn env
@@ -65,16 +75,17 @@
        (machine/evaluate (parse* k :expression))
        interpreter/last-value)))
 
-(defn reload!
-  ([]
-   (reload! (io/resource "sttr1.txt")))
-  ([file]
-   (swap! machine assoc :program (:program (load-file file)))
-   (swap! history (fn [history]
-                    (->> history
-                         (map #(assoc % :program (:program (load-file @machine file)))))))
+#?(:clj
+   (defn reload!
+     ([]
+      (reload! (sttr/txt)))
+     ([file]
+      (swap! machine assoc :program (:program (load-file file)))
+      (swap! history (fn [history]
+                       (->> history
+                            (map #(assoc % :program (:program (load-file @machine file)))))))
 
-   nil))
+      nil)))
 
 (defn step!
   ([]
@@ -105,15 +116,17 @@
   (swap! history pop)
   (print-next))
 
-(defn retry!
-  []
-  (back!)
-  (async/<?? (step!)))
+#?(:clj
+   (defn retry!
+     []
+     (back!)
+     (async/<?? (step!))))
 
 (defn -main [& argv]
   (start!)
-  (async/<?? (continue!)))
+  #?(:clj (async/<?? (continue!))
+     :cljs  (continue!)))
 
 (comment (grammar/parse (grammar/parser)
                         (interpreter/interpreter)
-                        (slurp (io/resource "sttr1.txt"))))
+                        (slurp (sttr/txt))))

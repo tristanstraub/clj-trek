@@ -1,14 +1,21 @@
 (ns trek.interpreter
-  (:require
-   [clj-time.core :as time.core]
-   [clj-time.local :as time.local]
-   [clojure.string :as str]
-   [trek.machine :as machine]
-   [clojure.core.async :as a]
-   [clojure.core.async :as async])
-  (:import java.lang.Math))
+  #?(:cljs (:require-macros [cljs.core.async :as a]))
+  (:require #?(:clj [clojure.core.async :as a]
+               :cljs [cljs.core.async :as a])
+            #?(:clj [clj-time.core :as time.core]
+               :cljs [cljs-time.core :as time.core])
+            #?(:clj [clj-time.local :as time.local]
+               :cljs [cljs-time.local :as time.local])
+            [clojure.string :as str]
+            [trek.machine :as machine])
+  #?(:clj (:import java.lang.Math)))
 
 (def ^:dynamic *line-number* nil)
+
+(defn parse-int
+  [v]
+  #?(:clj (Integer/parseInt v)
+     :cljs (js/parseInt v)))
 
 (defn interpreter []
   {:type    :interpreter
@@ -134,7 +141,7 @@
 
 (defeval :default
   (fn [& _]
-    (throw (Exception. "Unexecutable!"))))
+    (throw (ex-info "Unexecutable!" {}))))
 
 ;; -- statement --
 
@@ -263,9 +270,13 @@
 (defn convert-input [id value]
   (case (variable-type id)
     :string (str/upper-case value)
-    :number (Integer/parseInt value)
+    :number (parse-int value)
 
     (throw (ex-info "Not an integer" {:value value :id id}))))
+
+#?(:cljs (defn read-line
+           []
+           ""))
 
 (defn get-input [machin inputs]
   (loop [mac machin
@@ -432,7 +443,7 @@
                                            (value-type-of identifier))
                        :string (read-from-string (get-in machine [:env identifier])
                                                  (mapv #(dec (int (last-value (machine/evaluate machine %)))) dimensions))
-                       (throw (ex-data "Unrecognized array ref" {:identifier identifier :dimensions dimensions})))]
+                       (throw (ex-info "Unrecognized array ref" {:identifier identifier :dimensions dimensions})))]
       (assert value)
       (last-value machine value))))
 
@@ -456,7 +467,7 @@
                                                           (assert (= 1 (count dimensions)))
                                                           (apply str (repeat (first dimensions) " ")))
                                                 :number (new-array (value-type-of name) dimensions)
-                                                (throw (Exception. "Unknown array type"))))))
+                                                (throw (ex-info "Unknown array type" {}))))))
             machine
             array-defs)))
 
@@ -521,12 +532,17 @@
   [machine formatter]
   (last-value machine (first (machine/emitted machine formatter))))
 
+(defn fmt
+  [& args]
+  #?(:clj (apply format args)
+     :cljs ":unformatted:"))
+
 (defmethod machine/formatter [:interpreter :format-type]
   [machine formatter]
   (let [[format-type] (machine/emitted machine formatter)
 
         format-count  (if (< 1 (count format-type))
-                        (Integer/parseInt (apply str (butlast format-type)))
+                        (parse-int (apply str (butlast format-type)))
                         1)
         format-type   (last (str/lower-case format-type))
 
@@ -536,10 +552,10 @@
                         \x (last-value machine (apply str (repeat format-count (str " "))))
 
                         \a (last-value (update machine :unformatted pop)
-                                       (format (str "%" format-count "s") value))
+                                       (fmt (str "%" format-count "s") value))
 
                         \d (last-value (update machine :unformatted pop)
-                                       (format (str "%" format-count "d") (int value))))]
+                                       (fmt (str "%" format-count "d") (int value))))]
     machine))
 
 (defn format-list [machine formatter]

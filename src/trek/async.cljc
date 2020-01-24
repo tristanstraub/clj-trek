@@ -1,5 +1,4 @@
-(ns trek.async
-  (:require [clojure.core.async :as a]))
+(ns trek.async)
 
 (defmacro go? [& body]
   `(a/go (try ~@body
@@ -12,8 +11,9 @@
        (throw value#))
      value#))
 
-(defmacro <?? [& args]
-  `(let [value# (a/<!! ~@args)]
-     (when (instance? Throwable value#)
-       (throw value#))
-     value#))
+#?(:clj
+   (defmacro <?? [& args]
+     `(let [value# (a/<!! ~@args)]
+        (when (instance? Throwable value#)
+          (throw value#))
+        value#)))
