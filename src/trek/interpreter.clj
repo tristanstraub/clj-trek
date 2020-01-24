@@ -1,9 +1,10 @@
 (ns trek.interpreter
-  (:require [clojure.core.async :as a]
-            [clj-time.core :as time.core]
-            [clj-time.local :as time.local]
-            [clojure.string :as str]
-            [trek.machine :as machine])
+  (:require
+   [clj-time.core :as time.core]
+   [clj-time.local :as time.local]
+   [clojure.string :as str]
+   [trek.machine :as machine]
+   [clojure.core.async :as a])
   (:import java.lang.Math))
 
 (def ^:dynamic *line-number* nil)
@@ -36,31 +37,42 @@
   [machine statement]
   statement)
 
+(defonce last-machine
+  (atom nil))
+
 (defmethod machine/step :interpreter
   [machine]
-  (let [{:keys [lines]} (:program machine)
-        line            (get lines (:ptr machine))]
-    (assert line (:ptr machine))
-    (binding [*line-number* (:ptr machine)]
-      (as->
-          (machine/evaluate machine line)
-          machine
-          (cond-> machine
-            (:goto machine)
-            (-> (assoc :ptr (:goto machine))
-                (dissoc :goto))
+  (a/<!!
+   (a/go
+     (assert (number? (:ptr machine)) "machine/step:interpreter")
+     (let [{:keys [lines]} (:program machine)
+           line            (get lines (:ptr machine))]
+       (reset! last-machine {:line line
+                             :machine machine})
+       (assert line (:ptr machine))
+       (binding [*line-number* (:ptr machine)]
+         (as->
+             (machine/evaluate machine line)
+             machine
+             (cond-> machine
+               (:goto machine)
+               (-> (assoc :ptr (:goto machine))
+                   (dissoc :goto))
 
-            (not (:goto machine))
-            (assoc :ptr (next-line machine))
+               (not (:goto machine))
+               (as-> machine
+                   (do (assert (number? (next-line machine)))
+                       (assoc machine :ptr (next-line machine))))
 
-            true
-            (as-> machine
-                (loop [tasks (:async machine) machine machine]
-                  (if-let [task (first tasks)]
-                    (recur (rest tasks) (a/<!! (task machine)))
-                    (dissoc machine :async)))))))))
+               true
+               (as-> machine
+                   (loop [tasks (:async machine) machine machine]
+                     (if-let [task (first tasks)]
+                       (recur (rest tasks) (a/<! (task machine)))
+                       (dissoc machine :async)))))))))))
 
 (defn goto [machine n]
+  {:pre [(number? n)]}
   (-> machine
       (assoc :goto n)))
 
@@ -70,6 +82,7 @@
         (assoc :goto (nth line-numbers (dec i))))))
 
 (defn gosub [machine line-number]
+  {:pre [(number? line-number)]}
   (let [lines (get-in machine [:program :lines])]
     (-> machine
         (assoc :goto line-number)
@@ -84,9 +97,14 @@
   [machine program]
   (-> machine
       (assoc :program program)
-      (assoc :ptr (->> (keys (:lines program))
-                       sort
-                       first))))
+      (as-> machine
+          (do (assert (number? (->> (keys (:lines program))
+                                    sort
+                                    first))
+                      "load-program")
+              (assoc machine :ptr (->> (keys (:lines program))
+                                       sort
+                                       first))))))
 
 
 
@@ -145,7 +163,7 @@
 ;; -- PRINT --
 
 (defeval :print
-  (fn [machine args]
+  (fn [machine & [args]]
     (apply println (map #(last-value (machine/evaluate machine %)) args))
     machine))
 
@@ -163,18 +181,19 @@
 
 (defeval :gosub
   (fn [machine line-number]
+    (assert (number? line-number) :gosub)
     (gosub machine line-number)))
 
 ;; -- RETURN --
 
 (defeval :return
-  (fn [machine _]
+  (fn [machine & _]
     (return machine)))
 
 ;; -- IMAGE --
 
 (defeval :image
-  (fn [machine args]
+  (fn [machine & args]
     ;; TODO this is not used correctly
     machine))
 
@@ -233,23 +252,6 @@
 
 ;; -- INPUT
 
-(defmacro go? [& body]
-  `(a/go (try ~@body
-              (catch Throwable t#
-                t#))))
-
-(defmacro go-loop? [loop-args & body]
-  `(a/go (loop ~loop-args
-           (try ~@body
-                (catch Throwable t#
-                  t#)))))
-
-(defmacro <? [& args]
-  `(let [value# (a/<! ~@args)]
-     (when (instance? Throwable value#)
-       (throw value#))
-     value#))
-
 (defn async [machine f]
   (update machine :async conj f))
 
@@ -276,7 +278,7 @@
 
 (defeval :input
   (fn [machine inputs]
-    (async machine #(go? (get-input % inputs)))))
+    (async machine #(a/go (get-input % inputs)))))
 
 ;; -- IF
 

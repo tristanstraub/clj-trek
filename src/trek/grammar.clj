@@ -45,6 +45,7 @@
 
    {"goto = <\"GOTO\"> <ws> line-number" (fn
                                            [n]
+                                           (assert (number? n))
                                            (emit :goto n))}
 
    {"goto-of = <\"GOTO\"> <ws> expression <ws> (<'OF'> <ws> line-number (<','> line-number)*)" (fn
@@ -55,6 +56,7 @@
 
    {"gosub = <\"GOSUB\"> <ws> line-number" (fn
                                              [n]
+                                             (assert (number? n) "parse:gosub")
                                              (emit :gosub n))}
 
    {"return = <\"RETURN\">" (fn
