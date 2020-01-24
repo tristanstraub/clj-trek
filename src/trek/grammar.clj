@@ -14,19 +14,6 @@
   [type]
   (machine/emitted *machine* type))
 
-(defn parser []
-  {:parser     (rules/parser basic)
-   :transforms (rules/transforms basic)})
-
-(defn parse
-  ([parser machine listing]
-   (parse parse machine listing :program))
-  ([parser machine listing start]
-   {:pre [machine]}
-   (binding [*machine* machine]
-     (let [{:keys [parser transforms]} parser]
-       (doall (rules/parse parser transforms listing start))))))
-
 (def basic
   (merge
    {"program = S (<\"\n\"> S)* <\"\n\"?>"
@@ -248,3 +235,16 @@
    {"format-type = \"D\" | \"X\" | \"A\"" (fn
                                             [type]
                                             (emit :format-type type))}))
+
+(defn parser []
+  {:parser     (rules/parser basic)
+   :transforms (rules/transforms basic)})
+
+(defn parse
+  ([parser machine listing]
+   (parse parse machine listing :program))
+  ([parser machine listing start]
+   {:pre [machine]}
+   (binding [*machine* machine]
+     (let [{:keys [parser transforms]} parser]
+       (doall (rules/parse parser transforms listing start))))))
