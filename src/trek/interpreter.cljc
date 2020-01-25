@@ -10,7 +10,7 @@
                :cljs [cljs-time.local :as time.local])
             [clojure.string :as str]
             [trek.machine :as machine]
-            #?(:clj [clj.pprint :refer [cl-format]]
+            #?(:clj [clojure.pprint :refer [cl-format]]
                :cljs [cljs.pprint :refer [cl-format]]))
   #?(:clj (:import java.lang.Math)))
 
@@ -169,9 +169,17 @@
 
 ;; -- PRINT --
 
+(def terminal
+  (atom []))
+
+(defn terminal-print
+  [chars]
+  #?(:clj (apply println chars)
+     :cljs (swap! terminal #(apply conj % chars))))
+
 (defeval :print
   (fn [machine & [args]]
-    (apply println (map #(last-value (machine/evaluate machine %)) args))
+    (terminal-print (mapv #(last-value (machine/evaluate machine %)) args))
     machine))
 
 ;; -- GOTO --
@@ -528,7 +536,7 @@
     (let [image   (get-in machine [:program :lines line-number])
           values  (mapv #(last-value (machine/evaluate machine %)) expressions)
           machine (machine/formatter (assoc machine :unformatted (into [] (reverse values))) image)]
-      (println (last-value machine))
+      (terminal-print [(last-value machine)])
       (assert (not (seq (:unformatted machine))))
       machine)))
 
@@ -558,10 +566,10 @@
                         \x (last-value machine (apply str (repeat format-count (str " "))))
 
                         \a (last-value (update machine :unformatted pop)
-                                       (cl-format true (str "~" format-count "S") value))
+                                       (cl-format nil (str "~" format-count "A") value))
 
                         \d (last-value (update machine :unformatted pop)
-                                       (cl-format true (str "~" format-count "D") (int value))))]
+                                       (cl-format nil (str "~" format-count "D") (int value))))]
     machine))
 
 (defn format-list [machine formatter]
