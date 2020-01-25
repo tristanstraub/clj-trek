@@ -131,6 +131,10 @@
   #?(:clj (async/<?? (continue!))
      :cljs  (continue!)))
 
-(comment (grammar/parse (grammar/parser)
-                        (interpreter/interpreter)
-                        (slurp (sttr/txt))))
+(comment
+  (def mm (interpreter/interpreter))
+  (time (def pp (grammar/parser mm)))
+
+  (time (grammar/parse pp  mm (sttr/txt) :S))
+
+  )

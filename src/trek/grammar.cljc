@@ -24,12 +24,7 @@
 
 (def basic
   (merge
-   {"program = S (<\"\n\"> S)* <\"\n\"?>"
-    (fn
-      [machine statement & statements]
-      (emit machine :program `(~statement ~@statements)))}
-
-   {"S = line-number <ws+> statement <#';'?>" (fn
+   {"S = line-number <ws> statement <#';'?>" (fn
                                                 [machine n s]
                                                 (emit machine :statement n s))}
 
@@ -41,13 +36,13 @@
                                                                                                                                                            [machine s]
                                                                                                                                                            s)}
 
-   {"print = <\"PRINT\"> <ws>* (! 'USING' (<ws> | expression | <\",\"> | <\";\">))* " (fn
+   {"print = <\"PRINT\"> <ws?> (! 'USING' (<ws> | expression | <\",\"> | <\";\">))* " (fn
                                                                                         ([machine]
                                                                                          (emit machine :print))
                                                                                         ([machine & args]
                                                                                          (emit machine :print args)))}
 
-   {"print-using = <'PRINT'> <ws+> <'USING'> <ws> line-number (<';'> expression (<','> expression)*)?" (fn
+   {"print-using = <'PRINT'> <ws> <'USING'> <ws> line-number (<';'> expression (<','> expression)*)?" (fn
                                                                                                          [machine line-number & expressions]
                                                                                                          (emit machine :print-using [line-number expressions]))}
 
@@ -71,7 +66,7 @@
                               [machine]
                               (emit machine :return))}
 
-   {"for = <\"FOR\"> <ws> identifier <ws*> <'='> expression <ws> <'TO'> <ws> expression" (fn
+   {"for = <\"FOR\"> <ws> identifier <ws?> <'='> expression <ws> <'TO'> <ws> expression" (fn
                                                                                            [machine identifier lower upper]
                                                                                            (emit machine :for identifier lower upper))}
 
@@ -121,7 +116,7 @@
                                 [machine v]
                                 (emit machine :value (parse-int v)))}
 
-   {"ws = #'[ \t]'" (fn [& _])}
+   {"ws = #'[ \t]+'" (fn [& _])}
 
    {"comment = <\"REM\" #'.*'>" (fn
                                   [machine]
@@ -145,7 +140,7 @@
                                           [machine identifier]
                                           (emit machine :next identifier))}
 
-   {"bool-expression = expression <ws*> comparison-op <ws*> expression (<ws> bool-op <ws> bool-expression)?" (fn
+   {"bool-expression = expression <ws?> comparison-op <ws?> expression (<ws> bool-op <ws> bool-expression)?" (fn
                                                                                                                [machine a comparison-op b & [bool-op right]]
                                                                                                                (let [left (emit machine :compare a comparison-op b)]
                                                                                                                  (if right
@@ -202,7 +197,7 @@
                                                               [machine op]
                                                               op)}
 
-   {"decimal = #'[0-9]*' '.'? #'[0-9]+'" (fn
+   {"decimal = #'[0-9]*[.]?[0-9]+'" (fn
                                            [machine & values]
                                            (emit machine :value (parse-float (apply str values))))}
 
@@ -222,7 +217,7 @@
                          [machine]
                          :or)}
 
-   {"image = <\"IMAGE\"> <ws+> formatter-list" (fn
+   {"image = <\"IMAGE\"> <ws> formatter-list" (fn
                                                  [machine fl]
                                                  fl)}
 
@@ -253,8 +248,8 @@
 
 (defn parse
   ([parser machine listing]
-   (parse parse machine listing :program))
+   (parse parse machine listing :S))
   ([parser machine listing start]
    {:pre [machine]}
    (let [{:keys [parser transforms]} parser]
-     (doall (rules/parse parser transforms listing start)))))
+     (emit machine :program (rules/parse-lines parser transforms listing start)))))

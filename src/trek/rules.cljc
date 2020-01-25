@@ -16,11 +16,12 @@
 (defn parser [grammar]
   (insta/parser (rules grammar)))
 
-(defn parse [parser transforms input start]
-  (let [parsed (insta/parse parser input :start start)]
-    (if (instaparse.core/failure? parsed)
-      (throw (ex-info "Could not parse" parsed))
-      (insta/transform transforms parsed))))
+(defn parse-lines [parser transforms input start]
+  (for [line (str/split input #"\n")]
+    (let [parsed (insta/parse parser line :start start)]
+      (if (instaparse.core/failure? parsed)
+        (throw (ex-info "Could not parse" parsed))
+        (insta/transform transforms parsed)))))
 
 (comment (do
            (defgrammar basic defrule)
