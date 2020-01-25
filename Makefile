@@ -13,4 +13,6 @@ gh-pages:
 
 	make dist
 
-	cd dist && git add --all && git commit -m "Publishing to gh-pages" && git push origin gh-pages
+	(cd dist && git add --all && git commit -m "Publishing to gh-pages" && git push origin gh-pages)
+
+	git push origin gh-pages
