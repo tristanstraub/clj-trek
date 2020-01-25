@@ -1,5 +1,11 @@
+* Links
+
+https://github.com/tristanstraub/clj-trek/deployments
+
+* Building
+
 #+BEGIN_SRC sh
-boot run
+make gh-pages
 #+END_SRC
 
 #+BEGIN_SRC
