@@ -1,7 +1,11 @@
 (ns trek.grammar
+  (:require-macros #?(:cljs [trek.async-cljs :as async]))
   (:require [trek.machine :as machine]
             [trek.rules :as rules]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [cljs.core.async :as a]
+            #?(:clj [trek.async-cljs :as async])
+            ))
 
 (defn emit
   [machine statement-type & args]
@@ -24,9 +28,9 @@
 
 (def basic
   (merge
-   {"S = line-number <ws> statement <#';'?>" (fn
-                                                [machine n s]
-                                                (emit machine :statement n s))}
+   {"S = line-number <ws> statement <#';?'>" (fn
+                                               [machine n s]
+                                               (emit machine :statement n s))}
 
    {"line-number = #'[0-9]+'" (fn
                                 [machine n]
@@ -43,8 +47,8 @@
                                                                                          (emit machine :print args)))}
 
    {"print-using = <'PRINT'> <ws> <'USING'> <ws> line-number (<';'> expression (<','> expression)*)?" (fn
-                                                                                                         [machine line-number & expressions]
-                                                                                                         (emit machine :print-using [line-number expressions]))}
+                                                                                                        [machine line-number & expressions]
+                                                                                                        (emit machine :print-using [line-number expressions]))}
 
    {"goto = <\"GOTO\"> <ws> line-number" (fn
                                            [machine n]
@@ -198,8 +202,8 @@
                                                               op)}
 
    {"decimal = #'[0-9]*[.]?[0-9]+'" (fn
-                                           [machine & values]
-                                           (emit machine :value (parse-float (apply str values))))}
+                                      [machine & values]
+                                      (emit machine :value (parse-float (apply str values))))}
 
    {"end = <\"END\">" (fn
                         [machine]
@@ -218,8 +222,8 @@
                          :or)}
 
    {"image = <\"IMAGE\"> <ws> formatter-list" (fn
-                                                 [machine fl]
-                                                 fl)}
+                                                [machine fl]
+                                                fl)}
 
    {"formatter-list = formatter (<','> formatter)*" (fn
                                                       [machine a & bs]
@@ -251,5 +255,8 @@
    (parse parse machine listing :S))
   ([parser machine listing start]
    {:pre [machine]}
-   (let [{:keys [parser transforms]} parser]
-     (emit machine :program (rules/parse-lines parser transforms listing start)))))
+   (async/go?
+    (let [{:keys [parser transforms]} parser
+          parse-chan                  (rules/parse-lines parser transforms listing start)
+          coll                        (async/<? (a/into [] parse-chan))]
+      (emit machine :program coll)))))

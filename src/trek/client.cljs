@@ -5,7 +5,7 @@
             [trek.core]
             trek.interpreter
             [trek.async-cljs :as async]
-            [cljs.core.async]))
+            [cljs.core.async :as a]))
 
 (defonce input
   (atom nil))
@@ -27,8 +27,10 @@
      (str line "\n"))])
 
 (rum/defc top
-  []
+  < rum/reactive
+  [state]
   [:div "top"
+   [:div (str (rum/react (rum/cursor-in state [:message])))]
    [:input {:on-change (fn [e]
                          (.preventDefault e)
                          (reset! input (.. e -target -value)))}]
@@ -38,6 +40,18 @@
     "Send"]
    (terminal trek.interpreter/terminal)])
 
-(rum/mount (top) (dom/getElement "app"))
+(defonce state
+  (atom {:message "waiting"}))
 
-(trek.core/-main)
+(js/requestAnimationFrame
+ (fn []
+   (async/go?
+    (let [messages (trek.core/run)]
+      (loop []
+        (when-let [message (async/<? messages)]
+          (println :message message)
+          (js/requestAnimationFrame (fn []
+                                      (swap! state assoc :message (str message))))
+          (recur)))))))
+
+(rum/mount (top state) (dom/getElement "app"))
