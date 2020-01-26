@@ -6,6 +6,8 @@ dist:
 	cp target/public/cljs-out/dev-main.js dist/cljs-out
 
 gh-pages:
+	# See https://gist.github.com/cobyism/4730490;
+	# https://gist.github.com/cobyism/4730490#gistcomment-1961457
 	rm -rf dist
 	mkdir dist
 
