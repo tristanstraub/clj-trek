@@ -21,15 +21,11 @@
 
 (defn parse-lines
   [parser transforms input start]
-  (a/pipeline 1
-              (a/chan)
-              (map (fn [line]
-                     (println :line line)
-                     (let [parsed (insta/parse parser line :start start)]
-                       (if (instaparse.core/failure? parsed)
-                         (throw (ex-info "Could not parse" parsed))
-                         (insta/transform transforms parsed)))))
-              (a/to-chan (str/split input #"\n"))))
+  (for [line (str/split input #"\n")]
+    (let [parsed (insta/parse parser line :start start)]
+      (if (instaparse.core/failure? parsed)
+        (throw (ex-info "Could not parse" parsed))
+        (insta/transform transforms parsed)))))
 
 (comment (do
            (defgrammar basic defrule)

@@ -48,10 +48,14 @@
    (async/go?
     (let [messages (trek.core/run)]
       (loop []
-        (when-let [message (async/<? messages)]
-          (println :message message)
-          (js/requestAnimationFrame (fn []
-                                      (swap! state assoc :message (str message))))
-          (recur)))))))
+
+        (try (when-let [message (async/<? messages)]
+               (println :message message)
+               (js/requestAnimationFrame (fn []
+                                           (swap! state assoc :message (str message)))))
+             (catch js/Error e
+                 (.error js/console e)))
+
+        (recur))))))
 
 (rum/mount (top state) (dom/getElement "app"))

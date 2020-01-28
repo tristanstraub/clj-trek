@@ -1,12 +1,12 @@
 (ns trek.core
   #?(:cljs (:require-macros [trek.sttr :as sttr]
-                            [cljs.core.async]
                             [trek.async-cljs :as async]
                             [cljs.core.async :as a]))
   (:require  #?(:clj [clojure.core.async :as a]
                 :cljs [cljs.core.async :as a])
-             #?(:clj [trek.sttr :as sttr])
-             #?(:clj [trek.async :as async])
+             #?@(:clj [[trek.sttr :as sttr]
+                      [trek.async :as async]])
+
              [trek.grammar :as grammar]
              [trek.interpreter :as interpreter]
              [trek.rules :as rules]
@@ -38,15 +38,9 @@
       "Next:" (line)]))
   nil)
 
-(defn parse*
-  ([machine content]
-   (parse* content :program))
-  ([machine content start]
-   (grammar/parse (grammar/parser machine) (interpreter/interpreter) content start)))
-
-(defn load-program* [machine content]
+(defn load-program [machine content]
   (async/go?
-   (let [program (async/<? (grammar/parse (grammar/parser machine) machine content :S))]
+   (let [program (grammar/parse machine content :S)]
      (-> machine
          (assoc :source (-> content
                             (str/split #"\n")
@@ -54,24 +48,13 @@
                                  (into {}))))
          (machine/load-program program)))))
 
-(defn load-program [machine content]
-  (load-program* machine content))
-
 (defn start*
   [messages content]
   (async/go?
    (a/>! messages :loading)
-   (let [new-machine (async/<? (load-program* (interpreter/interpreter) content))]
+   (let [new-machine (async/<? (load-program (interpreter/interpreter) content))]
      (reset! machine new-machine)
      (a/>! messages :loaded))))
-
-(defn env
-  ([]
-   (:env @machine))
-  ([k]
-   (-> @machine
-       (machine/evaluate (parse* @machine k :expression))
-       interpreter/last-value)))
 
 #?(:clj
    (defn reload!

@@ -1,11 +1,11 @@
 (ns trek.grammar
-  (:require-macros #?(:cljs [trek.async-cljs :as async]))
-  (:require [trek.machine :as machine]
+  #?(:cljs (:require-macros [trek.async-cljs :as async]))
+  (:require #?@(:clj [[clojure.core.async :as a]
+                      [trek.async :as async]]
+                :cljs [[cljs.core.async :as a]])
+            [trek.machine :as machine]
             [trek.rules :as rules]
-            [clojure.string :as str]
-            [cljs.core.async :as a]
-            #?(:clj [trek.async-cljs :as async])
-            ))
+            [clojure.string :as str]))
 
 (defn emit
   [machine statement-type & args]
@@ -245,18 +245,10 @@
                                             [machine type]
                                             (emit machine :format-type type))}))
 
-(defn parser
-  [machine]
-  {:parser     (rules/parser basic)
-   :transforms (rules/transforms basic machine)})
-
 (defn parse
-  ([parser machine listing]
-   (parse parse machine listing :S))
-  ([parser machine listing start]
-   {:pre [machine]}
-   (async/go?
-    (let [{:keys [parser transforms]} parser
-          parse-chan                  (rules/parse-lines parser transforms listing start)
-          coll                        (async/<? (a/into [] parse-chan))]
-      (emit machine :program coll)))))
+  [machine listing start]
+  {:pre [machine]}
+  (emit machine :program (rules/parse-lines (rules/parser basic)
+                                            (rules/transforms basic machine)
+                                            listing
+                                            :S)))
