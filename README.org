@@ -87,3 +87,8 @@ COMBAT AREA      CONDITION RED
 ---------------------------------
 COMMAND:
 #+END_SRC
+
+* Tailwind
+
+tailwind-base.css, tailwind-component.css and tailwind-utilities.css are built
+with docker-tailwindcss

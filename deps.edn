@@ -1,16 +1,18 @@
 {:paths   ["src" "resources"]
- :deps    {org.clojure/clojure         {:mvn/version "1.10.1"}
-           org.clojure/clojurescript   {:mvn/version "1.10.520"}
-           instaparse                  {:mvn/version "1.4.10"}
+ :deps    {org.clojure/clojure            {:mvn/version "1.10.1"}
+           org.clojure/clojurescript      {:mvn/version "1.10.520"}
+           instaparse                     {:mvn/version "1.4.10"}
 
-           org.clojure/core.async      {:mvn/version "0.7.559"}
-           clj-time                    {:mvn/version "0.15.2"}
-           com.andrewmcveigh/cljs-time {:mvn/version "0.5.2"}
+           org.clojure/core.async         {:mvn/version "0.7.559"}
+           clj-time                       {:mvn/version "0.15.2"}
+           com.andrewmcveigh/cljs-time    {:mvn/version "0.5.2"}
 
-           org.clojure/core.match      {:mvn/version "0.3.0"}
-           rum                         {:mvn/version "0.11.3"}
+           org.clojure/core.match         {:mvn/version "0.3.0"}
+           rum                            {:mvn/version "0.11.3"}
 
-           com.tristanstraub/postcss   {:local/root "../postcss"}}
+           com.tristanstraub/garden-mower {:git/url "https://github.com/tristanstraub/garden-mower"
+                                           :sha "c8af31358ae1da496c18d3c9d2a35d049611d5f8"}}
+
  :aliases {:dev {:extra-paths ["target"]
                  :extra-deps  {com.bhauman/figwheel-main {:mvn/version "0.2.3"}
                                com.bhauman/rebel-readline-cljs {:mvn/version "0.1.4"}}

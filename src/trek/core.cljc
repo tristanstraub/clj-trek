@@ -16,6 +16,9 @@
 (defonce history (atom nil))
 (defonce machine (atom nil))
 
+(defonce source-code
+  (sttr/txt))
+
 (defn parse-int
   [v]
   #?(:clj (Integer/parseInt v)
