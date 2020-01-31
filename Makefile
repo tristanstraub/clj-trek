@@ -12,6 +12,11 @@ tailwind:
 	cd tailwind && ./build.sh
 	cp tailwind/tailwindcss/dist/* resources/public
 
+.PHONY: sttr
+sttr:
+	clj -e "(require 'trek.sttr) (trek.sttr/spit-program)"
+
+
 gh-pages:
 	# See https://gist.github.com/cobyism/4730490;
 	# https://gist.github.com/cobyism/4730490#gistcomment-1961457

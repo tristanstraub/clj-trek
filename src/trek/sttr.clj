@@ -12,7 +12,7 @@
 (defn spit-program
   []
   (with-open [out (io/output-stream (io/file "resources/public/sttr.transit+json"))]
-    (let [parsed (grammar/parse (interpreter/interpreter) (slurp (io/resource "sttr1.txt")) :S)
+    (let [parsed (grammar/parse (interpreter/interpreter) (slurp (io/resource "public/sttr1.txt")) :S)
           writer (transit/writer out :json)]
       (transit/write writer parsed))))
 
