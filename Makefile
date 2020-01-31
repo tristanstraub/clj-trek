@@ -1,6 +1,5 @@
 .PHONY: dist
 dist:
-	rm -fr target dist
 	clojure -A:dev -m figwheel.main --optimizations whitespace --build-once dev
 	mkdir -p dist/cljs-out
 	cp resources/public/* dist
@@ -9,7 +8,7 @@ dist:
 gh-pages:
 	# See https://gist.github.com/cobyism/4730490;
 	# https://gist.github.com/cobyism/4730490#gistcomment-1961457
-	rm -rf dist
+	rm -rf target dist
 	mkdir dist
 
 	git clone .git --branch gh-pages dist
