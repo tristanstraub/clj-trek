@@ -1,9 +1,8 @@
 (ns trek.sttr
   (:require [clojure.java.io :as io]
+            [cognitect.transit :as transit]
             [trek.grammar :as grammar]
-            [trek.interpreter :as interpreter]
-            [cognitect.transit :as transit])
-  (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
+            [trek.interpreter :as interpreter]))
 
 (defmacro txt
   []

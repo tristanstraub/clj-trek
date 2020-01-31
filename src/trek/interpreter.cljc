@@ -1,18 +1,24 @@
 (ns trek.interpreter
-  #?(:cljs (:require-macros [cljs.core.async]
-                            [trek.async-cljs :as async]))
-  (:require #?(:clj [trek.async :as async])
-            #?(:clj [clojure.core.async]
-               :cljs [cljs.core.async])
-            #?(:clj [clj-time.core :as time.core]
-               :cljs [cljs-time.core :as time.core])
-            #?(:clj [clj-time.local :as time.local]
-               :cljs [cljs-time.local :as time.local])
-            [clojure.string :as str]
-            [trek.machine :as machine]
-            #?(:clj [clojure.pprint :refer [cl-format]]
-               :cljs [cljs.pprint :refer [cl-format]]))
-  #?(:clj (:import java.lang.Math)))
+  #?@
+  (:clj
+   [(:require
+     [clj-time.core :as time.core]
+     [clj-time.local :as time.local]
+     clojure.core.async
+     [clojure.pprint :refer [cl-format]]
+     [clojure.string :as str]
+     [trek.async :as async]
+     [trek.machine :as machine])
+    (:import java.lang.Math)]
+   :cljs
+   [(:require
+     [cljs-time.core :as time.core]
+     [cljs-time.local :as time.local]
+     cljs.core.async
+     [cljs.pprint :refer [cl-format]]
+     [clojure.string :as str]
+     [trek.machine :as machine])
+    (:require-macros cljs.core.async [trek.async-cljs :as async])]))
 
 (defn parse-int
   [v]

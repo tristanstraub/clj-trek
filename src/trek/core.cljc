@@ -30,28 +30,28 @@
 
 (defn fetch-program
   []
-  #?(:clj (let [txt     (slurp (io/resource "public/sttr1.txt"))
-                program (grammar/parse (interpreter/interpreter) txt :S)]
-            {:txt     txt
-             :program program})
-
-     :cljs (let [txt     (async/<? (http/get "sttr1.txt" {}))
-                 program (->> (async/<? (http/get "sttr.transit+json" {}))
-                              :body
-                              (transit/read (transit/reader :json)))]
+  (async/go?
+   #?(:clj (let [txt     (slurp (io/resource "public/sttr1.txt"))
+                 program (grammar/parse (interpreter/interpreter) txt :S)]
              {:txt     txt
-              :program program})))
+              :program program})
+
+      :cljs (let [txt     (:body (async/<? (http/get "sttr1.txt" {})))
+                  program (->> (async/<? (http/get "sttr.transit+json" {}))
+                               :body
+                               (transit/read (transit/reader :json)))]
+              {:txt     txt
+               :program program}))))
 
 (defn run
-  []
-  (let [{:keys [txt program]} (fetch-program)]
-    (async/go?
-     (let [machine (async/<? (load-program (interpreter/interpreter) txt program))]
-       (loop [machine machine]
-         (recur (async/<? (machine/step machine))))))))
+  [{:keys [txt program]}]
+  (async/go?
+   (let [machine (async/<? (load-program (interpreter/interpreter) txt program))]
+     (loop [machine machine]
+       (recur (async/<? (machine/step machine)))))))
 
 #?(:clj
    (defn -main [& _]
-     (let [e (async/<?? (run))]
+     (let [e (async/<?? (run (async/<?? (fetch-program))))]
        (when (ex-data e)
          (throw e)))))

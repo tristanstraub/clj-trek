@@ -1,8 +1,5 @@
 (ns trek.rules
-  #?(:cljs (:require-macros [trek.async-cljs :as async]))
-  (:require #?(:clj [clojure.core.async :as a]
-               :cljs [cljs.core.async :as a])
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             [instaparse.core :as insta]))
 
 (defn rules [grammar]

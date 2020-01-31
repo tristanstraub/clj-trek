@@ -1,11 +1,11 @@
 (ns trek.client
   (:require-macros [cljs.core.async]
-                   [trek.style])
+                   [trek.style]
+                   [trek.async-cljs :as async])
   (:require [rum.core :as rum]
             [goog.dom :as dom]
             [trek.core]
             trek.interpreter
-            [trek.async-cljs :as async]
             [cljs.core.async :as a]
             [clojure.string :as str]))
 
@@ -35,9 +35,9 @@
   (trek.style/css))
 
 (rum/defc source-code
-  []
+  [txt]
   [:div.terminal
-   (for [[line-number line] (map vector (range) (str/split trek.core/source-code #"\n"))]
+   (for [[line-number line] (map vector (range) (str/split txt #"\n"))]
      [:pre {:key line-number} (str line "\n")])])
 
 (rum/defc nav
@@ -68,27 +68,24 @@
    (nav (rum/cursor-in state [:page]))
    [:div.container
     (case (rum/react (rum/cursor-in state [:page]))
-      :source-code (source-code)
+      :source-code (source-code (rum/react (rum/cursor-in state [:txt])))
       :terminal    (terminal trek.interpreter/terminal))]])
 
 (defonce state
   (atom {:page    :terminal
-         :message "waiting"}))
+         :message "waiting"
+         :txt     ""}))
 
-(defonce animation
-  (js/requestAnimationFrame
-   (fn []
-     (async/go?
-      (let [messages (trek.core/run)]
-        (loop []
+(defn main
+  []
+  (a/go
+    (try
+      (let [code (async/<? (trek.core/fetch-program))]
+        (swap! state assoc :txt (:txt code))
+        (async/<? (trek.core/run code)))
+      (catch js/Error e
+        (.error js/console e))))
 
-          (try (when-let [message (async/<? messages)]
-                 (println :message message)
-                 (js/requestAnimationFrame (fn []
-                                             (swap! state assoc :message (str message)))))
-               (catch js/Error e
-                 (.error js/console e)))
+  (rum/mount (top state) (dom/getElement "app")))
 
-          (recur)))))))
-
-(rum/mount (top state) (dom/getElement "app"))
+(main)
