@@ -5,6 +5,13 @@ dist:
 	cp resources/public/* dist
 	cp target/public/cljs-out/dev-main.js dist/cljs-out
 
+.PHONY: tailwind
+tailwind:
+	rm -fr tailwind
+	git clone https://github.com/tristanstraub/docker-tailwindcss tailwind
+	cd tailwind && ./build.sh
+	cp tailwind/tailwindcss/dist/* resources/public
+
 gh-pages:
 	# See https://gist.github.com/cobyism/4730490;
 	# https://gist.github.com/cobyism/4730490#gistcomment-1961457
