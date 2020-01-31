@@ -1,5 +1,5 @@
 .PHONY: dist
-dist:
+dist: sttr tailwind
 	clojure -A:dev -m figwheel.main --optimizations advanced --build-once dev
 	mkdir -p dist/cljs-out
 	cp resources/public/* dist
@@ -15,7 +15,6 @@ tailwind:
 .PHONY: sttr
 sttr:
 	clj -e "(require 'trek.sttr) (trek.sttr/spit-program)"
-
 
 gh-pages:
 	# See https://gist.github.com/cobyism/4730490;

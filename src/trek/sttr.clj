@@ -7,7 +7,7 @@
 
 (defmacro txt
   []
-  (slurp (io/resource "sttr1.txt")))
+  (slurp (io/resource "public/sttr1.txt")))
 
 (defn spit-program
   []
