@@ -24,13 +24,3 @@
      (attributes :.p-2 :.border :.border-4 :.border-white :.mt-12 :.overflow-x-hidden)
      [(pre (garden.selectors/nth-child "2n")) (attributes :.bg-green-500)]]
     [:.tab-button (attributes :.mr-2 :.mt-1 :.text-lg)]]))
-
-(comment
-
-
-  (garden.core/css
-   {:pretty-print? false}
-   [])
-
-
-  )

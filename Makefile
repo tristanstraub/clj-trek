@@ -1,5 +1,6 @@
 .PHONY: dist
 dist:
+	rm -fr target dist
 	clojure -A:dev -m figwheel.main --optimizations whitespace --build-once dev
 	mkdir -p dist/cljs-out
 	cp resources/public/* dist
