@@ -287,12 +287,9 @@
 
 #?(:cljs (defn send-input
            [value]
-           (println :sent value)
            (cljs.core.async/put! line-input value)))
 
 (defn get-input [machin inputs]
-  (println :get-input)
-
   (async/go?
    (loop [mac machin
           inputs inputs]
@@ -300,9 +297,7 @@
        (let [id (first (machine/emitted mac (first inputs)))]
          (recur (assoc-in mac [:env id] (convert-input id
                                                        #?(:clj (read-line)
-                                                          :cljs (do
-                                                                  (println :read-line)
-                                                                  (async/<? line-input)))))
+                                                          :cljs (async/<? line-input))))
                 (rest inputs)))
        mac))))
 
@@ -504,7 +499,7 @@
       (case fn-name
         "INT" (last-value machine (Math/floor arg))
         "RND" (last-value machine (* (Math/random) arg))
-        "TIM" (last-value machine (case arg
+        "TIM" (last-value machine (case (int arg)
                                     0 (time.core/minute (time.local/local-now))
                                     1 (time.core/hour (time.local/local-now))))
         "ABS" (last-value machine (Math/abs arg))
