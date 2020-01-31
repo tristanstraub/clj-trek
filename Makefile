@@ -2,7 +2,7 @@
 dist:
 	clojure -A:dev -m figwheel.main --optimizations whitespace --build-once dev
 	mkdir -p dist/cljs-out
-	cp resources/public/index.html dist
+	cp resources/public/* dist
 	cp target/public/cljs-out/dev-main.js dist/cljs-out
 
 gh-pages:
