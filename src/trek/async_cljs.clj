@@ -12,10 +12,3 @@
      (when (instance? js/Error value#)
        (throw value#))
      value#))
-
-#?(:clj
-   (defmacro <?? [& args]
-     `(let [value# (cljs.core.async/<!! ~@args)]
-        (when (instance? #?(:clj Throwable :cljs js/Error) value#)
-          (throw value#))
-        value#)))
