@@ -1,4 +1,0 @@
-- faster compile/load
-- remove console messages
-- style css
-- better read-line for browser
