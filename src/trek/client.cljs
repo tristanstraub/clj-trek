@@ -43,17 +43,21 @@
 (rum/defc nav
   [page]
   [:div.fixed.top-0.left-0.h-10.border-blue-600.border.bg-blue-500.w-full.shadow-xl.border-b-2.flex
-   [:ul.flex.mx-auto.my-1
-    [:li.mr-6 [:a.text-gray-900.hover:text-blue-700.cursor-pointer
+   [:ul.flex.mx-auto.my-1.text-gray-900
+    [:li.mr-6 [:a.hover:text-blue-700.cursor-pointer
                {:on-click (fn [e]
                             (.preventDefault e)
-                            (reset! page :terminal))}
+                            (reset! page :terminal))
+                :class    (when (= @page :terminal)
+                            "text-white")}
                "Terminal"]]
     [:li.mr-6 "|"]
-    [:li [:a.text-gray-900.hover:text-blue-700.cursor-pointer
+    [:li [:a.hover:text-blue-700.cursor-pointer
           {:on-click (fn [e]
                        (.preventDefault e)
-                       (reset! page :source-code))}
+                       (reset! page :source-code))
+           :class    (when (= @page :source-code)
+                       "text-white")}
           "Source code"]]]])
 
 (rum/defc top
