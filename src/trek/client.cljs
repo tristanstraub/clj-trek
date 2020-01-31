@@ -72,7 +72,7 @@
       :terminal    (terminal trek.interpreter/terminal))]])
 
 (defonce state
-  (atom {:page    :source-code
+  (atom {:page    :terminal
          :message "waiting"}))
 
 (defonce animation

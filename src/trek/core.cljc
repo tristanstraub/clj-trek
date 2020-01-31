@@ -1,17 +1,20 @@
 (ns trek.core
   #?(:cljs (:require-macros [trek.sttr :as sttr]
                             [trek.async-cljs :as async]
-                            [cljs.core.async :as a]))
-  (:require  #?(:clj [clojure.core.async :as a]
-                :cljs [cljs.core.async :as a])
+                            [cljs.core.async :as a]
+                            [clojure.java.io :as io]))
+  (:require  #?@(:clj [[clojure.core.async :as a]]
+                 :cljs [[cljs.core.async :as a]
+                        [cljs-http.client :as http]])
              #?@(:clj [[trek.sttr :as sttr]
-                      [trek.async :as async]])
-
+                       [trek.async :as async]])
+             #?(:clj [clojure.java.io :as io])
              [trek.grammar :as grammar]
              [trek.interpreter :as interpreter]
              [trek.rules :as rules]
              [clojure.string :as str]
-             [trek.machine :as machine]))
+             [trek.machine :as machine]
+             [cognitect.transit :as transit]))
 
 (defonce history (atom nil))
 (defonce machine (atom nil))
@@ -41,21 +44,20 @@
       "Next:" (line)]))
   nil)
 
-(defn load-program [machine content]
+(defn load-program [machine content program]
   (async/go?
-   (let [program (grammar/parse machine content :S)]
-     (-> machine
-         (assoc :source (-> content
-                            (str/split #"\n")
-                            (->> (map (fn [line] [(parse-int (re-find #"^[0-9]+" line)) line]))
-                                 (into {}))))
-         (machine/load-program program)))))
+   (-> machine
+       (assoc :source (-> content
+                          (str/split #"\n")
+                          (->> (map (fn [line] [(parse-int (re-find #"^[0-9]+" line)) line]))
+                               (into {}))))
+       (machine/load-program program))))
 
 (defn start*
-  [messages content]
+  [messages content program]
   (async/go?
    (a/>! messages :loading)
-   (let [new-machine (async/<? (load-program (interpreter/interpreter) content))]
+   (let [new-machine (async/<? (load-program (interpreter/interpreter) content program))]
      (reset! machine new-machine)
      (a/>! messages :loaded))))
 
@@ -112,9 +114,18 @@
 (defn run
   []
   (let [messages (a/chan)]
-    (-> (async/go? (async/<? (start* messages (sttr/txt)))
-                   #?(:clj (async/<? (continue! messages))
-                      :cljs  (async/<? (continue! messages))))
+    (-> (async/go?
+         (let [txt #?(:cljs (async/<? (http/get "sttr1.txt" {}))
+                      :clj (slurp (io/resource "public/sttr1.txt")))
+               program #?(:cljs (let [response (async/<? (http/get "sttr.transit+json" {}))]
+                                  (transit/read (transit/reader :json)
+                                                (:body response)))
+                          :clj (grammar/parse (interpreter/interpreter)
+                                              (slurp (io/resource "public/sttr1.txt"))
+                                              :S))]
+           (async/<? (start* messages txt program)))
+         #?(:clj (async/<? (continue! messages))
+            :cljs  (async/<? (continue! messages))))
         #?(:clj async/<??))
     messages))
 
