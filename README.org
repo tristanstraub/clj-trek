@@ -1,4 +1,5 @@
-*clj-trek* implements a HP BASIC interpreter that can run's Mike Mayfield's Star Trek game
+*clj-trek* is a clojure HP BASIC interpreter that runs Mike Mayfield's classis Star Trek game.
+See [[http://www.dunnington.info/public/startrek/]]
 
 Play: [[https://tristanstraub.github.io/clj-trek/]]
 
