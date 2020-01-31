@@ -20,12 +20,10 @@
    [[:body (attributes :.bg-gray-700)]
     [:.container (attributes :.mx-auto :.bg-green-400 :.mt-2)]
     [:input (attributes :.border :.border-blue-900 :.border-3 :.bg-gray-400 :.mx-2 :.p-1 :.rounded)]
-    #_ [:button (attributes :.border :.border-blue-300 :.rounded :.bg-gray-200 :.px-2 :.py-1)]
     [:.terminal
      (attributes :.p-2 :.border :.border-4 :.border-white :.mt-12 :.overflow-x-hidden)
      [(pre (garden.selectors/nth-child "2n")) (attributes :.bg-green-500)]]
-    [:.tab-button (attributes :.mr-2 :.mt-1 :.text-lg)]
-    ]))
+    [:.tab-button (attributes :.mr-2 :.mt-1 :.text-lg)]]))
 
 (comment
 
